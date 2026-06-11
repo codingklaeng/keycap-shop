@@ -9,7 +9,7 @@ import { ORDER_STATUS_LABEL, type OrderStatus } from "@/lib/types";
 type BoardLetter = {
   position: number;
   char: string;
-  keycap_colors: { name: string; swatch: string | null } | null;
+  keycap_colors: { name: string; key_color: string; text_color: string } | null;
 };
 
 type BoardOrder = {
@@ -29,7 +29,7 @@ type BoardOrder = {
 const SELECT =
   "id,queue_number,status,text,total_price,note,created_at," +
   "base_sizes(max_chars,base_types(name)),base_colors(name,swatch),pendants(name)," +
-  "order_letters(position,char,keycap_colors(name,swatch))";
+  "order_letters(position,char,keycap_colors(name,key_color,text_color))";
 
 function baseLabel(o: BoardOrder): string {
   const s = o.base_sizes;
@@ -192,8 +192,11 @@ function OrderCard({
         {letters.map((l) => (
           <span
             key={l.position}
-            className="flex h-9 w-9 items-center justify-center rounded-md text-base font-bold text-white shadow"
-            style={{ background: l.keycap_colors?.swatch ?? "#888" }}
+            className="flex h-9 w-9 items-center justify-center rounded-md text-base font-bold shadow"
+            style={{
+              background: l.keycap_colors?.key_color ?? "#888",
+              color: l.keycap_colors?.text_color ?? "#fff",
+            }}
             title={l.keycap_colors?.name ?? ""}
           >
             {l.char}

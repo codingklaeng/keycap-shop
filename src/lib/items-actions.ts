@@ -47,7 +47,8 @@ type BaseVariantInput = {
 type KeycapColorInput = {
   id?: string;
   name: string;
-  swatch?: string | null;
+  key_color?: string;
+  text_color?: string;
   image_url?: string | null;
   price: number;
   sort_order?: number;

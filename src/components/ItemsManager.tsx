@@ -432,7 +432,8 @@ function KeycapsTab({
     await saveKeycapColor({
       id,
       name: String(fd.get("name")),
-      swatch: str(fd, "swatch"),
+      key_color: String(fd.get("key_color")),
+      text_color: String(fd.get("text_color")),
       price: num(fd, "price"),
       sort_order: num(fd, "sort_order"),
       active: fd.get("active") === "on",
@@ -455,9 +456,14 @@ function KeycapsTab({
       <div className="space-y-3">
         <h2 className="font-semibold">สีของตัวอักษร</h2>
         <Card>
-          <form action={(fd) => saveColor(fd)} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <form action={(fd) => saveColor(fd)} className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             <input name="name" placeholder="ชื่อสี" required className={inp} />
-            <input name="swatch" type="color" defaultValue="#ef4444" className="h-10 w-full rounded-lg border border-border" />
+            <label className="text-xs text-muted">สีแป้น
+              <input name="key_color" type="color" defaultValue="#ef4444" className="h-9 w-full rounded-lg border border-border" />
+            </label>
+            <label className="text-xs text-muted">สีตัวหนังสือ
+              <input name="text_color" type="color" defaultValue="#ffffff" className="h-9 w-full rounded-lg border border-border" />
+            </label>
             <input name="price" type="number" placeholder="บวกราคา/ตัว" defaultValue={0} className={inp} />
             <input type="hidden" name="sort_order" value={colors.length + 1} />
             <input type="hidden" name="active" value="on" />
@@ -466,14 +472,28 @@ function KeycapsTab({
         </Card>
         {colors.map((c) => (
           <Card key={c.id}>
-            <form action={(fd) => saveColor(fd, c.id)} className="grid grid-cols-2 items-center gap-2 sm:grid-cols-5">
+            <form action={(fd) => saveColor(fd, c.id)} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-6">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted">ตัวอย่าง</span>
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-md text-sm font-bold"
+                  style={{ background: c.key_color, color: c.text_color }}
+                >
+                  A
+                </span>
+              </div>
               <input name="name" defaultValue={c.name} className={inp} />
-              <input name="swatch" type="color" defaultValue={c.swatch ?? "#ef4444"} className="h-10 w-full rounded-lg border border-border" />
+              <label className="text-xs text-muted">สีแป้น
+                <input name="key_color" type="color" defaultValue={c.key_color} className="h-9 w-full rounded-lg border border-border" />
+              </label>
+              <label className="text-xs text-muted">สีตัวหนังสือ
+                <input name="text_color" type="color" defaultValue={c.text_color} className="h-9 w-full rounded-lg border border-border" />
+              </label>
               <input name="price" type="number" defaultValue={c.price} className={inp} />
+              <input type="hidden" name="sort_order" defaultValue={c.sort_order} />
               <label className="flex items-center gap-1 text-sm">
                 <input type="checkbox" name="active" defaultChecked={c.active} /> เปิด
               </label>
-              <input type="hidden" name="sort_order" defaultValue={c.sort_order} />
               <div className="flex gap-2">
                 <button className={btnSave}>บันทึก</button>
                 <DeleteBtn onClick={async () => { await deleteItem("keycap_colors", c.id); onDone(); }} />
@@ -510,7 +530,12 @@ function KeycapsTab({
                   <th className="sticky left-0 bg-background p-2 text-left">ตัว</th>
                   {colors.map((c) => (
                     <th key={c.id} className="p-2">
-                      <span className="inline-block h-4 w-4 rounded-full align-middle" style={{ background: c.swatch ?? "#ccc" }} />
+                      <span
+                        className="mx-auto flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold"
+                        style={{ background: c.key_color, color: c.text_color }}
+                      >
+                        A
+                      </span>
                       <div className="text-[10px] text-muted">{c.name}</div>
                     </th>
                   ))}

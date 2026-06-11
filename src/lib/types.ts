@@ -37,7 +37,8 @@ export type BaseVariant = {
 export type KeycapColor = {
   id: string;
   name: string;
-  swatch: string | null;
+  key_color: string; // สีแป้น (keycap background)
+  text_color: string; // สีตัวหนังสือ (legend color)
   image_url: string | null;
   price: number;
   sort_order: number;
@@ -106,7 +107,7 @@ export type OrderDetail = {
   letters: {
     position: number;
     char: string;
-    color: { name: string; swatch: string | null } | null;
+    color: { name: string; key_color: string; text_color: string } | null;
   }[];
 };
 

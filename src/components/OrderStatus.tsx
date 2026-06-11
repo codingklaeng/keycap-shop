@@ -144,8 +144,11 @@ export function OrderStatus({ id }: { id: string }) {
             {order.letters.map((l) => (
               <span
                 key={l.position}
-                className="flex h-9 w-9 items-center justify-center rounded-md text-base font-bold text-white shadow"
-                style={{ background: l.color?.swatch ?? "#888" }}
+                className="flex h-9 w-9 items-center justify-center rounded-md text-base font-bold shadow"
+                style={{
+                  background: l.color?.key_color ?? "#888",
+                  color: l.color?.text_color ?? "#fff",
+                }}
               >
                 {l.char}
               </span>

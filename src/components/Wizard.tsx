@@ -357,13 +357,18 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
                                 }))
                               }
                               title={c.name}
-                              className={`h-9 w-9 rounded-full border-2 transition ${
+                              className={`flex h-9 w-9 items-center justify-center rounded-full border-2 text-sm font-bold transition ${
                                 selected
                                   ? "border-primary scale-110"
                                   : "border-border"
                               }`}
-                              style={{ background: c.swatch ?? "#ddd" }}
-                            />
+                              style={{
+                                background: c.key_color,
+                                color: c.text_color,
+                              }}
+                            >
+                              {l.char}
+                            </button>
                           );
                         })}
                       </div>
@@ -424,8 +429,11 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
                     return (
                       <span
                         key={l.position}
-                        className="flex h-9 w-9 items-center justify-center rounded-md text-base font-bold text-white shadow"
-                        style={{ background: c?.swatch ?? "#888" }}
+                        className="flex h-9 w-9 items-center justify-center rounded-md text-base font-bold shadow"
+                        style={{
+                          background: c?.key_color ?? "#888",
+                          color: c?.text_color ?? "#fff",
+                        }}
                       >
                         {l.char}
                       </span>
