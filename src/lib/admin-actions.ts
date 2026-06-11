@@ -37,3 +37,29 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
   const { error } = await sb.from("orders").update({ status }).eq("id", id);
   if (error) throw new Error(error.message);
 }
+
+// Cancel + restock atomically (via SQL function)
+export async function cancelOrder(id: string) {
+  if (!(await isAdmin())) throw new Error("unauthorized");
+  const sb = createAdminClient();
+  const { error } = await sb.rpc("cancel_order", { p_id: id });
+  if (error) throw new Error(error.message);
+}
+
+const BOARD_SELECT =
+  "id,queue_number,status,text,total_price,note,created_at," +
+  "base_sizes(max_chars,base_types(name)),base_colors(name,swatch),pendants(name)," +
+  "order_letters(position,char,keycap_colors(name,key_color,text_color))";
+
+// Read today's orders for the shop board (service role; polled by the client).
+export async function getTodayOrders(today: string) {
+  if (!(await isAdmin())) throw new Error("unauthorized");
+  const sb = createAdminClient();
+  const { data, error } = await sb
+    .from("orders")
+    .select(BOARD_SELECT)
+    .eq("queue_date", today)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}

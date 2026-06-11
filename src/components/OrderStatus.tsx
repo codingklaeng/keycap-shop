@@ -36,26 +36,16 @@ export function OrderStatus({ id }: { id: string }) {
   useEffect(() => {
     saveLastOrder(id);
     load();
-
-    const sb = createBrowserClient();
-    const channel = sb
-      .channel(`order-${id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "orders",
-          filter: `id=eq.${id}`,
-        },
-        () => load()
-      )
-      .subscribe();
-
-    return () => {
-      sb.removeChannel(channel);
-    };
   }, [id, load]);
+
+  // poll for status changes until the order reaches a terminal state
+  useEffect(() => {
+    if (order && (order.status === "picked_up" || order.status === "cancelled")) {
+      return;
+    }
+    const t = setInterval(load, 5000);
+    return () => clearInterval(t);
+  }, [load, order]);
 
   if (loading) {
     return (

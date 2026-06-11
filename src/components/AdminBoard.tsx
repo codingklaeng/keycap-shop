@@ -1,8 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { createBrowserClient } from "@/lib/supabase/client";
-import { updateOrderStatus } from "@/lib/admin-actions";
+import {
+  updateOrderStatus,
+  cancelOrder,
+  getTodayOrders,
+} from "@/lib/admin-actions";
 import { formatBaht } from "@/lib/price";
 import { ORDER_STATUS_LABEL, type OrderStatus } from "@/lib/types";
 
@@ -25,11 +28,6 @@ type BoardOrder = {
   pendants: { name: string } | null;
   order_letters: BoardLetter[];
 };
-
-const SELECT =
-  "id,queue_number,status,text,total_price,note,created_at," +
-  "base_sizes(max_chars,base_types(name)),base_colors(name,swatch),pendants(name)," +
-  "order_letters(position,char,keycap_colors(name,key_color,text_color))";
 
 function baseLabel(o: BoardOrder): string {
   const s = o.base_sizes;
@@ -54,40 +52,43 @@ export function AdminBoard({ today }: { today: string }) {
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const sb = createBrowserClient();
-    const { data } = await sb
-      .from("orders")
-      .select(SELECT)
-      .eq("queue_date", today)
-      .order("created_at", { ascending: true });
-    setOrders((data ?? []) as unknown as BoardOrder[]);
-    setLoading(false);
+    try {
+      const data = await getTodayOrders(today);
+      setOrders(data as unknown as BoardOrder[]);
+    } catch {
+      // ignore transient errors; next poll retries
+    } finally {
+      setLoading(false);
+    }
   }, [today]);
 
   useEffect(() => {
     load();
-    const sb = createBrowserClient();
-    const channel = sb
-      .channel("admin-board")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        () => load()
-      )
-      .subscribe();
-    return () => {
-      sb.removeChannel(channel);
-    };
+    const t = setInterval(load, 5000); // near-realtime via polling
+    return () => clearInterval(t);
   }, [load]);
 
   async function changeStatus(id: string, to: OrderStatus) {
     setBusy(id);
-    // optimistic
     setOrders((prev) =>
       prev.map((o) => (o.id === id ? { ...o, status: to } : o))
     );
     try {
       await updateOrderStatus(id, to);
+    } catch {
+      load();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function cancel(id: string) {
+    setBusy(id);
+    setOrders((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, status: "cancelled" } : o))
+    );
+    try {
+      await cancelOrder(id);
     } catch {
       load();
     } finally {
@@ -126,7 +127,7 @@ export function AdminBoard({ today }: { today: string }) {
             order={o}
             busy={busy === o.id}
             onAdvance={changeStatus}
-            onCancel={(id) => changeStatus(id, "cancelled")}
+            onCancel={(id) => cancel(id)}
           />
         ))}
       </div>
