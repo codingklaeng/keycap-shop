@@ -1,0 +1,39 @@
+"use server";
+
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { ADMIN_COOKIE, adminToken, isAdmin } from "@/lib/admin-auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import type { OrderStatus } from "@/lib/types";
+
+export async function login(_prev: unknown, formData: FormData) {
+  const password = String(formData.get("password") ?? "");
+  if (!process.env.ADMIN_PASSWORD) {
+    return { error: "ยังไม่ได้ตั้งค่า ADMIN_PASSWORD ในเซิร์ฟเวอร์" };
+  }
+  if (password !== process.env.ADMIN_PASSWORD) {
+    return { error: "รหัสผ่านไม่ถูกต้อง" };
+  }
+  const store = await cookies();
+  store.set(ADMIN_COOKIE, adminToken(), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+  });
+  redirect("/admin");
+}
+
+export async function logout() {
+  const store = await cookies();
+  store.delete(ADMIN_COOKIE);
+  redirect("/admin/login");
+}
+
+export async function updateOrderStatus(id: string, status: OrderStatus) {
+  if (!(await isAdmin())) throw new Error("unauthorized");
+  const sb = createAdminClient();
+  const { error } = await sb.from("orders").update({ status }).eq("id", id);
+  if (error) throw new Error(error.message);
+}

@@ -1,0 +1,157 @@
+"use server";
+
+import { randomUUID } from "crypto";
+import { isAdmin } from "@/lib/admin-auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+async function guard() {
+  if (!(await isAdmin())) throw new Error("unauthorized");
+  return createAdminClient();
+}
+
+type BaseSizeInput = {
+  id?: string;
+  label: string;
+  max_chars: number;
+  price: number;
+  sort_order?: number;
+  active?: boolean;
+};
+
+type BaseColorInput = {
+  id?: string;
+  name: string;
+  swatch?: string | null;
+  image_url?: string | null;
+  price_modifier: number;
+  stock: number;
+  sort_order?: number;
+  active?: boolean;
+};
+
+type KeycapColorInput = {
+  id?: string;
+  name: string;
+  swatch?: string | null;
+  image_url?: string | null;
+  price: number;
+  sort_order?: number;
+  active?: boolean;
+};
+
+type PendantInput = {
+  id?: string;
+  name: string;
+  image_url?: string | null;
+  price: number;
+  stock: number;
+  sort_order?: number;
+  active?: boolean;
+};
+
+export async function saveBaseSize(input: BaseSizeInput) {
+  const sb = await guard();
+  const { error } = await sb.from("base_sizes").upsert(input);
+  if (error) throw new Error(error.message);
+}
+
+export async function saveBaseColor(input: BaseColorInput) {
+  const sb = await guard();
+  const { error } = await sb.from("base_colors").upsert(input);
+  if (error) throw new Error(error.message);
+}
+
+export async function saveKeycapColor(input: KeycapColorInput) {
+  const sb = await guard();
+  // Insert returns the new row so we can backfill stock rows for every char.
+  const { data, error } = await sb
+    .from("keycap_colors")
+    .upsert(input)
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+
+  // ensure a stock row exists for this color for every existing char
+  if (data?.id) {
+    const { data: chars } = await sb
+      .from("keycap_stock")
+      .select("char")
+      .order("char");
+    const distinct = Array.from(new Set((chars ?? []).map((c) => c.char)));
+    if (distinct.length > 0) {
+      await sb
+        .from("keycap_stock")
+        .upsert(
+          distinct.map((ch) => ({ char: ch, color_id: data.id, stock: 0 })),
+          { onConflict: "char,color_id", ignoreDuplicates: true }
+        );
+    }
+  }
+}
+
+export async function savePendant(input: PendantInput) {
+  const sb = await guard();
+  const { error } = await sb.from("pendants").upsert(input);
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteItem(
+  table: "base_sizes" | "base_colors" | "keycap_colors" | "pendants",
+  id: string
+) {
+  const sb = await guard();
+  const { error } = await sb.from(table).delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function setKeycapStock(
+  char: string,
+  colorId: string,
+  stock: number
+) {
+  const sb = await guard();
+  const { error } = await sb
+    .from("keycap_stock")
+    .upsert(
+      { char, color_id: colorId, stock: Math.max(0, Math.floor(stock)) },
+      { onConflict: "char,color_id" }
+    );
+  if (error) throw new Error(error.message);
+}
+
+// Add one or more characters: creates a stock row (default 0) for each keycap color.
+export async function addKeycapChars(chars: string[]) {
+  const sb = await guard();
+  const { data: colors } = await sb.from("keycap_colors").select("id");
+  const colorIds = (colors ?? []).map((c) => c.id);
+  const rows = chars.flatMap((ch) =>
+    colorIds.map((cid) => ({ char: ch, color_id: cid, stock: 0 }))
+  );
+  if (rows.length === 0) return;
+  const { error } = await sb
+    .from("keycap_stock")
+    .upsert(rows, { onConflict: "char,color_id", ignoreDuplicates: true });
+  if (error) throw new Error(error.message);
+}
+
+export async function removeKeycapChar(char: string) {
+  const sb = await guard();
+  const { error } = await sb.from("keycap_stock").delete().eq("char", char);
+  if (error) throw new Error(error.message);
+}
+
+// Upload an image to the public 'images' bucket; returns its public URL.
+export async function uploadImage(formData: FormData): Promise<string> {
+  const sb = await guard();
+  const file = formData.get("file") as File | null;
+  const folder = String(formData.get("folder") ?? "misc");
+  if (!file) throw new Error("no file");
+  const ext = file.name.split(".").pop() ?? "png";
+  const path = `${folder}/${randomUUID()}.${ext}`;
+  const { error } = await sb.storage
+    .from("images")
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (error) throw new Error(error.message);
+  const { data } = sb.storage.from("images").getPublicUrl(path);
+  return data.publicUrl;
+}
