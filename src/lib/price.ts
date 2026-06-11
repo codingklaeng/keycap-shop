@@ -1,16 +1,14 @@
-import type { BaseColor, BaseSize, KeycapColor, LetterChoice, Pendant } from "@/lib/types";
+import type { BaseVariant, KeycapColor, LetterChoice, Pendant } from "@/lib/types";
 
 export function calcPrice(args: {
-  size: BaseSize | null;
-  baseColor: BaseColor | null;
+  variant: BaseVariant | null;
   letters: LetterChoice[];
   keycapColors: KeycapColor[];
   pendant: Pendant | null;
 }): number {
-  const { size, baseColor, letters, keycapColors, pendant } = args;
+  const { variant, letters, keycapColors, pendant } = args;
   let total = 0;
-  if (size) total += Number(size.price);
-  if (baseColor) total += Number(baseColor.price_modifier);
+  if (variant) total += Number(variant.price);
   const colorPrice = new Map(keycapColors.map((c) => [c.id, Number(c.price)]));
   for (const l of letters) {
     if (l.keycap_color_id) total += colorPrice.get(l.keycap_color_id) ?? 0;

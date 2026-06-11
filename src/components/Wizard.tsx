@@ -9,14 +9,13 @@ import { calcPrice, formatBaht } from "@/lib/price";
 import { saveLastOrder } from "@/components/TrackOrderButton";
 import type { Catalog, LetterChoice } from "@/lib/types";
 
-const STEPS = ["ข้อความ", "สีฐาน", "สีตัวอักษร", "ตัวห้อย", "ยืนยัน"];
+const STEPS = ["ข้อความ + ขนาด", "สีฐาน", "สีตัวอักษร", "ตัวห้อย", "ยืนยัน"];
 
 const ERROR_TH: Record<string, string> = {
   EMPTY_TEXT: "กรุณาพิมพ์ข้อความ",
-  TEXT_TOO_LONG: "ข้อความยาวเกินขนาดฐานที่เลือก",
-  BASE_SIZE_INVALID: "ขนาดฐานไม่ถูกต้อง",
-  BASE_COLOR_INVALID: "สีฐานไม่ถูกต้อง",
-  BASE_COLOR_OUT: "สีฐานที่เลือกหมดสต็อกแล้ว",
+  TEXT_TOO_LONG: "ข้อความยาวเกินจำนวนช่องของฐานที่เลือก",
+  BASE_VARIANT_INVALID: "ฐาน/สีที่เลือกไม่ถูกต้อง",
+  BASE_OUT: "ฐานสีที่เลือกหมดสต็อกแล้ว",
   PENDANT_INVALID: "ตัวห้อยไม่ถูกต้อง",
   PENDANT_OUT: "ตัวห้อยที่เลือกหมดสต็อกแล้ว",
   KEYCAP_COLOR_INVALID: "สีตัวอักษรไม่ถูกต้อง",
@@ -33,8 +32,11 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [text, setText] = useState("");
+  const [typeId, setTypeId] = useState<string | null>(
+    catalog.baseTypes[0]?.id ?? null
+  );
   const [sizeId, setSizeId] = useState<string | null>(null);
-  const [baseColorId, setBaseColorId] = useState<string | null>(null);
+  const [colorId, setColorId] = useState<string | null>(null);
   const [letterColors, setLetterColors] = useState<Record<number, string>>({});
   const [pendantId, setPendantId] = useState<string | null>(
     catalog.pendants[0]?.id ?? null
@@ -43,7 +45,7 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // char -> set of color ids that have stock for that char
+  // char -> set of keycap color ids in stock
   const availability = useMemo(() => {
     const map = new Map<string, Set<string>>();
     for (const s of catalog.keycapStock) {
@@ -54,10 +56,21 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
     return map;
   }, [catalog.keycapStock]);
 
+  // size ids that have at least one in-stock variant
+  const sizesWithVariant = useMemo(
+    () => new Set(catalog.baseVariants.map((v) => v.base_size_id)),
+    [catalog.baseVariants]
+  );
+
   const graphemes = useMemo(() => splitGraphemes(text), [text]);
   const size = catalog.baseSizes.find((s) => s.id === sizeId) ?? null;
-  const baseColor = catalog.baseColors.find((c) => c.id === baseColorId) ?? null;
+  const variant =
+    catalog.baseVariants.find(
+      (v) => v.base_size_id === sizeId && v.base_color_id === colorId
+    ) ?? null;
   const pendant = catalog.pendants.find((p) => p.id === pendantId) ?? null;
+  const baseColor = catalog.baseColors.find((c) => c.id === colorId) ?? null;
+  const baseType = catalog.baseTypes.find((t) => t.id === typeId) ?? null;
 
   const letters: LetterChoice[] = graphemes.map((ch, i) => ({
     position: i,
@@ -66,18 +79,39 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
   }));
 
   const price = calcPrice({
-    size,
-    baseColor,
+    variant,
     letters,
     keycapColors: catalog.keycapColors,
     pendant,
   });
 
-  // characters that the shop cannot make (no color in stock)
-  const unmakeable = graphemes.filter(
-    (ch) => !availability.has(ch) || availability.get(ch)!.size === 0
+  const uniqueUnmakeable = Array.from(
+    new Set(
+      graphemes.filter(
+        (ch) => !availability.has(ch) || availability.get(ch)!.size === 0
+      )
+    )
   );
-  const uniqueUnmakeable = Array.from(new Set(unmakeable));
+
+  // sizes for the selected type that fit the text length and have a variant
+  const sizeOptions = catalog.baseSizes.filter(
+    (s) =>
+      s.base_type_id === typeId &&
+      sizesWithVariant.has(s.id) &&
+      (graphemes.length === 0 || graphemes.length <= s.max_chars)
+  );
+
+  // colors available for the chosen size (from in-stock variants)
+  const colorOptions = useMemo(() => {
+    if (!sizeId) return [];
+    return catalog.baseVariants
+      .filter((v) => v.base_size_id === sizeId)
+      .map((v) => ({
+        variant: v,
+        color: catalog.baseColors.find((c) => c.id === v.base_color_id)!,
+      }))
+      .filter((x) => x.color);
+  }, [sizeId, catalog.baseVariants, catalog.baseColors]);
 
   function colorsForChar(ch: string) {
     const ids = availability.get(ch) ?? new Set<string>();
@@ -85,19 +119,14 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
   }
 
   function handleTextChange(v: string) {
-    // keycaps are uppercase; match the seeded stock and typical look
     const upper = v.toUpperCase();
     setText(upper);
-    // assign a default color for any newly added position
     const next: Record<number, string> = {};
-    const gs = splitGraphemes(upper);
-    gs.forEach((ch, i) => {
+    splitGraphemes(upper).forEach((ch, i) => {
       const opts = availability.get(ch);
       const current = letterColors[i];
-      if (current && opts?.has(current)) {
-        next[i] = current;
-      } else if (opts && opts.size > 0) {
-        // pick first available color (in catalog order)
+      if (current && opts?.has(current)) next[i] = current;
+      else if (opts && opts.size > 0) {
         const first = catalog.keycapColors.find((c) => opts.has(c.id));
         if (first) next[i] = first.id;
       }
@@ -105,28 +134,33 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
     setLetterColors(next);
   }
 
-  // ---- step validation ----
-  const sizesThatFit = catalog.baseSizes.filter(
-    (s) => graphemes.length <= s.max_chars
-  );
+  function chooseSize(id: string) {
+    setSizeId(id);
+    // reset color if it has no variant for this size
+    if (colorId) {
+      const ok = catalog.baseVariants.some(
+        (v) => v.base_size_id === id && v.base_color_id === colorId
+      );
+      if (!ok) setColorId(null);
+    }
+  }
+
   const canLeaveText =
     graphemes.length > 0 &&
     !!size &&
     graphemes.length <= (size?.max_chars ?? 0) &&
     uniqueUnmakeable.length === 0;
-  const canLeaveBaseColor = !!baseColor;
+  const canLeaveBaseColor = !!variant;
   const allLettersColored = letters.every((l) => !!l.keycap_color_id);
-  const canLeaveLetters = allLettersColored;
 
   async function submit() {
     setError(null);
-    if (!size || !baseColor) return;
+    if (!variant) return;
     setSubmitting(true);
     try {
       const sb = createBrowserClient();
       const { data, error: rpcError } = await sb.rpc("place_order", {
-        p_base_size_id: size.id,
-        p_base_color_id: baseColor.id,
+        p_base_variant_id: variant.id,
         p_pendant_id: pendant?.id ?? null,
         p_letters: letters.map((l) => ({
           position: l.position,
@@ -149,9 +183,10 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
     }
   }
 
+  const sizeLabel = (maxChars: number) => `${maxChars} ช่อง`;
+
   return (
     <div className="flex-1 flex flex-col">
-      {/* header */}
       <header className="sticky top-0 z-10 border-b border-border bg-card/80 backdrop-blur">
         <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
           <Link href="/" className="text-sm text-muted">
@@ -193,41 +228,53 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
               )}
             </div>
 
-            <div>
-              <label className="mb-2 block font-semibold">เลือกขนาดฐาน</label>
-              <div className="grid gap-2">
-                {catalog.baseSizes.map((s) => {
-                  const fits = graphemes.length <= s.max_chars;
-                  const selected = s.id === sizeId;
-                  return (
+            {catalog.baseTypes.length > 1 && (
+              <div>
+                <label className="mb-2 block font-semibold">เลือกแบบฐาน</label>
+                <div className="flex flex-wrap gap-2">
+                  {catalog.baseTypes.map((t) => (
                     <button
-                      key={s.id}
-                      disabled={!fits && graphemes.length > 0}
-                      onClick={() => setSizeId(s.id)}
-                      className={`flex items-center justify-between rounded-xl border px-4 py-3 text-left transition ${
-                        selected
+                      key={t.id}
+                      onClick={() => {
+                        setTypeId(t.id);
+                        setSizeId(null);
+                        setColorId(null);
+                      }}
+                      className={`rounded-xl border px-4 py-2 font-medium transition ${
+                        t.id === typeId
                           ? "border-primary bg-primary/5"
-                          : "border-border bg-card"
-                      } ${
-                        !fits && graphemes.length > 0
-                          ? "opacity-40 cursor-not-allowed"
-                          : "hover:border-primary"
+                          : "border-border bg-card hover:border-primary"
                       }`}
                     >
-                      <div>
-                        <div className="font-medium">{s.label}</div>
-                        <div className="text-xs text-muted">
-                          สูงสุด {s.max_chars} ตัว
-                        </div>
-                      </div>
-                      <div className="font-semibold">{formatBaht(s.price)}</div>
+                      {t.name}
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-              {graphemes.length > 0 && sizesThatFit.length === 0 && (
+            )}
+
+            <div>
+              <label className="mb-2 block font-semibold">
+                เลือกจำนวนช่อง{baseType ? ` (${baseType.name})` : ""}
+              </label>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                {sizeOptions.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => chooseSize(s.id)}
+                    className={`rounded-xl border px-3 py-3 text-center font-medium transition ${
+                      s.id === sizeId
+                        ? "border-primary bg-primary/5"
+                        : "border-border bg-card hover:border-primary"
+                    }`}
+                  >
+                    {sizeLabel(s.max_chars)}
+                  </button>
+                ))}
+              </div>
+              {graphemes.length > 0 && sizeOptions.length === 0 && (
                 <p className="mt-2 text-sm text-red-600">
-                  ข้อความยาวเกินทุกขนาด กรุณาลดจำนวนตัวอักษร
+                  ไม่มีขนาดที่รองรับข้อความนี้ กรุณาลดจำนวนตัวอักษร
                 </p>
               )}
             </div>
@@ -237,40 +284,39 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
         {step === 1 && (
           <section>
             <label className="mb-3 block font-semibold">เลือกสีฐาน</label>
-            <div className="grid grid-cols-2 gap-3">
-              {catalog.baseColors.map((c) => {
-                const selected = c.id === baseColorId;
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => setBaseColorId(c.id)}
-                    className={`rounded-xl border p-3 text-left transition ${
-                      selected
-                        ? "border-primary bg-primary/5"
-                        : "border-border bg-card hover:border-primary"
-                    }`}
-                  >
-                    <div
-                      className="mb-2 h-16 w-full rounded-lg border border-border bg-cover bg-center"
-                      style={{
-                        background: c.image_url
-                          ? undefined
-                          : c.swatch ?? "#ddd",
-                        backgroundImage: c.image_url
-                          ? `url(${c.image_url})`
-                          : undefined,
-                      }}
-                    />
-                    <div className="font-medium">{c.name}</div>
-                    <div className="text-xs text-muted">
-                      {Number(c.price_modifier) > 0
-                        ? `+${formatBaht(c.price_modifier)}`
-                        : "ราคามาตรฐาน"}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+            {colorOptions.length === 0 ? (
+              <p className="text-sm text-muted">ยังไม่มีสีสำหรับขนาดนี้</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                {colorOptions.map(({ variant: v, color: c }) => {
+                  const selected = c.id === colorId;
+                  const img = v.image_url ?? c.image_url;
+                  return (
+                    <button
+                      key={v.id}
+                      onClick={() => setColorId(c.id)}
+                      className={`rounded-xl border p-3 text-left transition ${
+                        selected
+                          ? "border-primary bg-primary/5"
+                          : "border-border bg-card hover:border-primary"
+                      }`}
+                    >
+                      <div
+                        className="mb-2 h-20 w-full rounded-lg border border-border bg-cover bg-center"
+                        style={{
+                          background: img ? undefined : c.swatch ?? "#ddd",
+                          backgroundImage: img ? `url(${img})` : undefined,
+                        }}
+                      />
+                      <div className="font-medium">{c.name}</div>
+                      <div className="text-sm font-semibold text-primary">
+                        {formatBaht(v.price)}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </section>
         )}
 
@@ -357,9 +403,7 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
                     </div>
                     <div className="font-medium">{p.name}</div>
                     <div className="text-xs text-muted">
-                      {Number(p.price) > 0
-                        ? `+${formatBaht(p.price)}`
-                        : "ฟรี"}
+                      {Number(p.price) > 0 ? `+${formatBaht(p.price)}` : "ฟรี"}
                     </div>
                   </button>
                 );
@@ -391,12 +435,14 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
               </div>
               <dl className="space-y-1 text-sm">
                 <Row label="ข้อความ" value={text} />
-                <Row label="ขนาดฐาน" value={size?.label ?? "-"} />
-                <Row label="สีฐาน" value={baseColor?.name ?? "-"} />
                 <Row
-                  label="ตัวห้อย"
-                  value={pendant ? pendant.name : "ไม่มี"}
+                  label="ฐาน"
+                  value={`${baseType ? baseType.name + " · " : ""}${
+                    size ? size.max_chars + " ช่อง" : "-"
+                  }`}
                 />
+                <Row label="สีฐาน" value={baseColor?.name ?? "-"} />
+                <Row label="ตัวห้อย" value={pendant ? pendant.name : "ไม่มี"} />
               </dl>
             </div>
 
@@ -422,7 +468,6 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
         )}
       </main>
 
-      {/* footer nav + live price */}
       <footer className="fixed inset-x-0 bottom-0 border-t border-border bg-card">
         <div className="mx-auto flex max-w-lg items-center gap-3 px-4 py-3">
           {step > 0 && (
@@ -442,7 +487,7 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
               disabled={
                 (step === 0 && !canLeaveText) ||
                 (step === 1 && !canLeaveBaseColor) ||
-                (step === 2 && !canLeaveLetters)
+                (step === 2 && !allLettersColored)
               }
               onClick={() => setStep((s) => s + 1)}
               className="rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground disabled:opacity-40"

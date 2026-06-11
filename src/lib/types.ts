@@ -1,8 +1,14 @@
+export type BaseType = {
+  id: string;
+  name: string;
+  sort_order: number;
+  active: boolean;
+};
+
 export type BaseSize = {
   id: string;
-  label: string;
-  max_chars: number;
-  price: number;
+  base_type_id: string | null;
+  max_chars: number; // = จำนวนช่อง
   sort_order: number;
   active: boolean;
 };
@@ -12,8 +18,18 @@ export type BaseColor = {
   name: string;
   swatch: string | null;
   image_url: string | null;
-  price_modifier: number;
+  sort_order: number;
+  active: boolean;
+};
+
+// A sellable product: a (size × color) pairing with its own price/stock/image
+export type BaseVariant = {
+  id: string;
+  base_size_id: string;
+  base_color_id: string;
+  price: number;
   stock: number;
+  image_url: string | null;
   sort_order: number;
   active: boolean;
 };
@@ -95,8 +111,10 @@ export type OrderDetail = {
 };
 
 export type Catalog = {
+  baseTypes: BaseType[];
   baseSizes: BaseSize[];
   baseColors: BaseColor[];
+  baseVariants: BaseVariant[];
   keycapColors: KeycapColor[];
   keycapStock: KeycapStock[];
   pendants: Pendant[];

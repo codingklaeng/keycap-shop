@@ -20,7 +20,7 @@ type BoardOrder = {
   total_price: number;
   note: string | null;
   created_at: string;
-  base_sizes: { label: string } | null;
+  base_sizes: { max_chars: number; base_types: { name: string } | null } | null;
   base_colors: { name: string; swatch: string | null } | null;
   pendants: { name: string } | null;
   order_letters: BoardLetter[];
@@ -28,8 +28,14 @@ type BoardOrder = {
 
 const SELECT =
   "id,queue_number,status,text,total_price,note,created_at," +
-  "base_sizes(label),base_colors(name,swatch),pendants(name)," +
+  "base_sizes(max_chars,base_types(name)),base_colors(name,swatch),pendants(name)," +
   "order_letters(position,char,keycap_colors(name,swatch))";
+
+function baseLabel(o: BoardOrder): string {
+  const s = o.base_sizes;
+  if (!s) return "-";
+  return `${s.base_types ? s.base_types.name + " · " : ""}${s.max_chars} ช่อง`;
+}
 
 // status -> next action button
 const NEXT_ACTION: Partial<
@@ -196,7 +202,7 @@ function OrderCard({
       </div>
 
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-        <Info label="ฐาน" value={order.base_sizes?.label ?? "-"} />
+        <Info label="ฐาน" value={baseLabel(order)} />
         <Info label="สีฐาน" value={order.base_colors?.name ?? "-"} />
         <Info label="ตัวห้อย" value={order.pendants?.name ?? "ไม่มี"} />
         <Info label="ราคา" value={formatBaht(Number(order.total_price))} />

@@ -9,11 +9,17 @@ async function guard() {
   return createAdminClient();
 }
 
+type BaseTypeInput = {
+  id?: string;
+  name: string;
+  sort_order?: number;
+  active?: boolean;
+};
+
 type BaseSizeInput = {
   id?: string;
-  label: string;
-  max_chars: number;
-  price: number;
+  base_type_id: string;
+  max_chars: number; // = จำนวนช่อง
   sort_order?: number;
   active?: boolean;
 };
@@ -23,8 +29,17 @@ type BaseColorInput = {
   name: string;
   swatch?: string | null;
   image_url?: string | null;
-  price_modifier: number;
+  sort_order?: number;
+  active?: boolean;
+};
+
+type BaseVariantInput = {
+  id?: string;
+  base_size_id: string;
+  base_color_id: string;
+  price: number;
   stock: number;
+  image_url?: string | null;
   sort_order?: number;
   active?: boolean;
 };
@@ -49,6 +64,12 @@ type PendantInput = {
   active?: boolean;
 };
 
+export async function saveBaseType(input: BaseTypeInput) {
+  const sb = await guard();
+  const { error } = await sb.from("base_types").upsert(input);
+  if (error) throw new Error(error.message);
+}
+
 export async function saveBaseSize(input: BaseSizeInput) {
   const sb = await guard();
   const { error } = await sb.from("base_sizes").upsert(input);
@@ -58,6 +79,14 @@ export async function saveBaseSize(input: BaseSizeInput) {
 export async function saveBaseColor(input: BaseColorInput) {
   const sb = await guard();
   const { error } = await sb.from("base_colors").upsert(input);
+  if (error) throw new Error(error.message);
+}
+
+export async function saveBaseVariant(input: BaseVariantInput) {
+  const sb = await guard();
+  const { error } = await sb
+    .from("base_variants")
+    .upsert(input, { onConflict: "base_size_id,base_color_id" });
   if (error) throw new Error(error.message);
 }
 
@@ -96,7 +125,13 @@ export async function savePendant(input: PendantInput) {
 }
 
 export async function deleteItem(
-  table: "base_sizes" | "base_colors" | "keycap_colors" | "pendants",
+  table:
+    | "base_types"
+    | "base_sizes"
+    | "base_colors"
+    | "base_variants"
+    | "keycap_colors"
+    | "pendants",
   id: string
 ) {
   const sb = await guard();
