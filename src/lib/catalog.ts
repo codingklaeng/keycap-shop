@@ -8,7 +8,20 @@ import type {
   KeycapColor,
   KeycapStock,
   Pendant,
+  SocialPlatform,
 } from "@/lib/types";
+
+// Active social platforms for the NFC keychain ordering page (in stock).
+export async function getActivePlatforms(): Promise<SocialPlatform[]> {
+  const sb = createBrowserClient();
+  const { data } = await sb
+    .from("social_platforms")
+    .select("*")
+    .eq("active", true)
+    .gt("stock", 0)
+    .order("sort_order");
+  return (data ?? []) as SocialPlatform[];
+}
 
 // Read the active catalog for the customer ordering wizard.
 // Uses the public key; RLS allows read of all rows so we filter active here.

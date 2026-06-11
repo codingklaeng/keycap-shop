@@ -10,6 +10,7 @@ import {
   saveBaseVariant,
   saveKeycapColor,
   savePendant,
+  saveSocialPlatform,
   deleteItem,
   setKeycapStock,
   addKeycapChars,
@@ -23,9 +24,17 @@ import type {
   KeycapColor,
   KeycapStock,
   Pendant,
+  SocialPlatform,
 } from "@/lib/types";
 
-type Tab = "types" | "sizes" | "baseColors" | "variants" | "keycaps" | "pendants";
+type Tab =
+  | "types"
+  | "sizes"
+  | "baseColors"
+  | "variants"
+  | "keycaps"
+  | "pendants"
+  | "nfc";
 const TABS: { key: Tab; label: string }[] = [
   { key: "types", label: "แบบฐาน" },
   { key: "sizes", label: "ขนาดฐาน" },
@@ -33,6 +42,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "variants", label: "จับคู่ฐาน+สี (ราคา/สต็อก)" },
   { key: "keycaps", label: "สีตัวอักษร + สต็อก" },
   { key: "pendants", label: "ตัวห้อย" },
+  { key: "nfc", label: "NFC (social)" },
 ];
 
 export function ItemsManager(props: {
@@ -43,6 +53,7 @@ export function ItemsManager(props: {
   keycapColors: KeycapColor[];
   keycapStock: KeycapStock[];
   pendants: Pendant[];
+  platforms: SocialPlatform[];
 }) {
   const [tab, setTab] = useState<Tab>("types");
   const router = useRouter();
@@ -92,6 +103,76 @@ export function ItemsManager(props: {
       {tab === "pendants" && (
         <PendantsTab pendants={props.pendants} onDone={refresh} />
       )}
+      {tab === "nfc" && (
+        <PlatformsTab platforms={props.platforms} onDone={refresh} />
+      )}
+    </div>
+  );
+}
+
+/* ---------- NFC social platforms ---------- */
+
+function PlatformsTab({
+  platforms,
+  onDone,
+}: {
+  platforms: SocialPlatform[];
+  onDone: () => void;
+}) {
+  async function save(fd: FormData, id?: string) {
+    await saveSocialPlatform({
+      id,
+      name: String(fd.get("name")),
+      url_template: String(fd.get("url_template")),
+      hint: str(fd, "hint"),
+      icon: str(fd, "icon"),
+      price: num(fd, "price"),
+      stock: num(fd, "stock"),
+      sort_order: num(fd, "sort_order"),
+      active: fd.get("active") === "on",
+    });
+    onDone();
+  }
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted">
+        ใช้ <code>{"{id}"}</code> ใน URL template แทนชื่อช่อง เช่น{" "}
+        <code>https://facebook.com/{"{id}"}</code> — ลูกค้ากรอกชื่อช่อง ระบบจะแทนให้
+      </p>
+      <Card>
+        <p className="mb-2 font-semibold">เพิ่มแพลตฟอร์มใหม่</p>
+        <form action={(fd) => save(fd)} className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <input name="icon" placeholder="ไอคอน (อิโมจิ)" className={inp} />
+          <input name="name" placeholder="ชื่อ เช่น Facebook" required className={inp} />
+          <input name="url_template" placeholder="https://facebook.com/{id}" required className={`${inp} sm:col-span-2`} />
+          <input name="hint" placeholder="คำใบ้ช่องกรอก" className={inp} />
+          <input name="price" type="number" placeholder="ราคา" defaultValue={0} className={inp} />
+          <input name="stock" type="number" placeholder="สต็อก" defaultValue={0} className={inp} />
+          <input type="hidden" name="sort_order" value={platforms.length + 1} />
+          <input type="hidden" name="active" value="on" />
+          <button className={btnAdd}>เพิ่ม</button>
+        </form>
+      </Card>
+      {platforms.map((p) => (
+        <Card key={p.id}>
+          <form action={(fd) => save(fd, p.id)} className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <input name="icon" defaultValue={p.icon ?? ""} placeholder="ไอคอน" className={inp} />
+            <input name="name" defaultValue={p.name} className={inp} />
+            <input name="url_template" defaultValue={p.url_template} className={`${inp} sm:col-span-2`} />
+            <input name="hint" defaultValue={p.hint ?? ""} placeholder="คำใบ้" className={inp} />
+            <input name="price" type="number" defaultValue={p.price} className={inp} />
+            <input name="stock" type="number" defaultValue={p.stock} className={inp} />
+            <input type="hidden" name="sort_order" defaultValue={p.sort_order} />
+            <label className="flex items-center gap-1 text-sm">
+              <input type="checkbox" name="active" defaultChecked={p.active} /> เปิดขาย
+            </label>
+            <div className="flex gap-2">
+              <button className={btnSave}>บันทึก</button>
+              <DeleteBtn onClick={async () => { await deleteItem("social_platforms", p.id); onDone(); }} />
+            </div>
+          </form>
+        </Card>
+      ))}
     </div>
   );
 }

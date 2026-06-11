@@ -129,29 +129,43 @@ export function OrderStatus({ id }: { id: string }) {
 
       {/* details */}
       <div className="mt-6 rounded-2xl border border-border bg-card p-4">
-        <div className="mb-3 text-center">
-          <div className="inline-flex flex-wrap justify-center gap-1">
-            {order.letters.map((l) => (
-              <span
-                key={l.position}
-                className="flex h-9 w-9 items-center justify-center rounded-md text-base font-bold shadow"
-                style={{
-                  background: l.color?.key_color ?? "#888",
-                  color: l.color?.text_color ?? "#fff",
-                }}
-              >
-                {l.char}
-              </span>
-            ))}
-          </div>
-        </div>
-        <dl className="space-y-1 text-sm">
-          <Row label="ข้อความ" value={order.text} />
-          <Row label="ขนาดฐาน" value={order.base_size?.label ?? "-"} />
-          <Row label="สีฐาน" value={order.base_color?.name ?? "-"} />
-          <Row label="ตัวห้อย" value={order.pendant?.name ?? "ไม่มี"} />
-          {order.note && <Row label="หมายเหตุ" value={order.note} />}
-        </dl>
+        {order.product_type === "nfc" ? (
+          <dl className="space-y-1 text-sm">
+            <Row label="สินค้า" value="พวงกุญแจ NFC" />
+            <Row
+              label="แพลตฟอร์ม"
+              value={`${order.nfc?.icon ?? ""} ${order.nfc?.platform ?? "-"}`.trim()}
+            />
+            <Row label="ช่อง/ID" value={order.nfc?.value ?? order.text} />
+            {order.note && <Row label="หมายเหตุ" value={order.note} />}
+          </dl>
+        ) : (
+          <>
+            <div className="mb-3 text-center">
+              <div className="inline-flex flex-wrap justify-center gap-1">
+                {order.letters.map((l) => (
+                  <span
+                    key={l.position}
+                    className="flex h-9 w-9 items-center justify-center rounded-md text-base font-bold shadow"
+                    style={{
+                      background: l.color?.key_color ?? "#888",
+                      color: l.color?.text_color ?? "#fff",
+                    }}
+                  >
+                    {l.char}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <dl className="space-y-1 text-sm">
+              <Row label="ข้อความ" value={order.text} />
+              <Row label="ขนาดฐาน" value={order.base_size?.label ?? "-"} />
+              <Row label="สีฐาน" value={order.base_color?.name ?? "-"} />
+              <Row label="ตัวห้อย" value={order.pendant?.name ?? "ไม่มี"} />
+              {order.note && <Row label="หมายเหตุ" value={order.note} />}
+            </dl>
+          </>
+        )}
         <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
           <span className="font-semibold">ราคารวม</span>
           <span className="text-lg font-bold">

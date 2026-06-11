@@ -15,12 +15,22 @@ export default function Home() {
           เลือกขนาด เลือกสี เลือกตัวห้อย
         </p>
 
-        <Link
-          href="/order/new"
-          className="mt-8 block w-full rounded-xl bg-primary px-6 py-4 text-lg font-semibold text-primary-foreground shadow-md transition hover:opacity-90"
-        >
-          เริ่มสั่งสินค้า
-        </Link>
+        <div className="mt-8 grid gap-3">
+          <Link
+            href="/order/new"
+            className="block rounded-xl bg-primary px-6 py-4 text-left text-primary-foreground shadow-md transition hover:opacity-90"
+          >
+            <div className="text-lg font-semibold">⌨️ พวงกุญแจคีย์แคป</div>
+            <div className="text-sm opacity-90">สั่งทำตามชื่อ เลือกสี+ตัวห้อย</div>
+          </Link>
+          <Link
+            href="/order/nfc"
+            className="block rounded-xl border border-border bg-card px-6 py-4 text-left text-foreground shadow-sm transition hover:border-primary"
+          >
+            <div className="text-lg font-semibold">📱 พวงกุญแจ NFC</div>
+            <div className="text-sm text-muted">แตะแชร์ช่อง social ของคุณ</div>
+          </Link>
+        </div>
 
         <TrackOrderButton />
 

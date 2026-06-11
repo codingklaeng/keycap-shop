@@ -20,8 +20,10 @@ function shiftDay(date: string, days: number): string {
 type Row = {
   status: OrderStatus;
   total_price: number;
+  product_type: "keycap" | "nfc";
   base_colors: { name: string } | null;
   pendants: { name: string } | null;
+  order_nfc: { social_platforms: { name: string } | null }[] | { social_platforms: { name: string } | null } | null;
 };
 
 export default async function SummaryPage({
@@ -37,7 +39,9 @@ export default async function SummaryPage({
   const sb = createAdminClient();
   const { data } = await sb
     .from("orders")
-    .select("status,total_price,base_colors(name),pendants(name)")
+    .select(
+      "status,total_price,product_type,base_colors(name),pendants(name),order_nfc(social_platforms(name))"
+    )
     .eq("queue_date", date);
   const rows = (data ?? []) as unknown as Row[];
 
@@ -59,6 +63,11 @@ export default async function SummaryPage({
   };
   const topColors = tally((r) => r.base_colors?.name);
   const topPendants = tally((r) => r.pendants?.name);
+  const topPlatforms = tally((r) => {
+    const n = r.order_nfc;
+    const one = Array.isArray(n) ? n[0] : n;
+    return one?.social_platforms?.name;
+  });
 
   const isToday = date === bangkokToday();
 
@@ -116,6 +125,7 @@ export default async function SummaryPage({
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <TopList title="สีฐานขายดี" items={topColors} />
           <TopList title="ตัวห้อยขายดี" items={topPendants} />
+          <TopList title="NFC แพลตฟอร์มขายดี" items={topPlatforms} />
         </div>
       </div>
     </div>

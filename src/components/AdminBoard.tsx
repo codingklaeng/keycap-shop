@@ -8,11 +8,18 @@ import {
 } from "@/lib/admin-actions";
 import { formatBaht } from "@/lib/price";
 import { ORDER_STATUS_LABEL, type OrderStatus } from "@/lib/types";
+import { CopyButton } from "@/components/CopyButton";
 
 type BoardLetter = {
   position: number;
   char: string;
   keycap_colors: { name: string; key_color: string; text_color: string } | null;
+};
+
+type BoardNfc = {
+  social_value: string;
+  social_url: string;
+  social_platforms: { name: string; icon: string | null } | null;
 };
 
 type BoardOrder = {
@@ -23,16 +30,24 @@ type BoardOrder = {
   total_price: number;
   note: string | null;
   created_at: string;
+  product_type: "keycap" | "nfc";
   base_sizes: { max_chars: number; base_types: { name: string } | null } | null;
   base_colors: { name: string; swatch: string | null } | null;
   pendants: { name: string } | null;
   order_letters: BoardLetter[];
+  order_nfc: BoardNfc | BoardNfc[] | null;
 };
 
 function baseLabel(o: BoardOrder): string {
   const s = o.base_sizes;
   if (!s) return "-";
   return `${s.base_types ? s.base_types.name + " · " : ""}${s.max_chars} ช่อง`;
+}
+
+function nfcOf(o: BoardOrder): BoardNfc | null {
+  const n = o.order_nfc;
+  if (!n) return null;
+  return Array.isArray(n) ? (n[0] ?? null) : n;
 }
 
 // status -> next action button
@@ -170,6 +185,8 @@ function OrderCard({
   const letters = [...order.order_letters].sort(
     (a, b) => a.position - b.position
   );
+  const isNfc = order.product_type === "nfc";
+  const nfc = nfcOf(order);
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
@@ -184,33 +201,56 @@ function OrderCard({
           </div>
         </div>
         <span className="rounded-full bg-background px-3 py-1 text-xs font-medium">
+          {isNfc ? "📱 NFC · " : ""}
           {ORDER_STATUS_LABEL[order.status]}
         </span>
       </div>
 
-      {/* letters with colors for assembly */}
-      <div className="mt-3 flex flex-wrap gap-1">
-        {letters.map((l) => (
-          <span
-            key={l.position}
-            className="flex h-9 w-9 items-center justify-center rounded-md text-base font-bold shadow"
-            style={{
-              background: l.keycap_colors?.key_color ?? "#888",
-              color: l.keycap_colors?.text_color ?? "#fff",
-            }}
-            title={l.keycap_colors?.name ?? ""}
-          >
-            {l.char}
-          </span>
-        ))}
-      </div>
+      {isNfc ? (
+        /* NFC: show platform + handle + generated url to write to the tag */
+        <div className="mt-3 space-y-2">
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+            <Info
+              label="แพลตฟอร์ม"
+              value={`${nfc?.social_platforms?.icon ?? ""} ${
+                nfc?.social_platforms?.name ?? "-"
+              }`.trim()}
+            />
+            <Info label="ราคา" value={formatBaht(Number(order.total_price))} />
+            <Info label="ช่อง/ID" value={nfc?.social_value ?? order.text} />
+          </dl>
+          <div className="flex items-center gap-2 rounded-lg bg-background px-3 py-2">
+            <code className="flex-1 break-all text-xs">{nfc?.social_url}</code>
+            {nfc?.social_url && <CopyButton text={nfc.social_url} label="คัดลอก URL" />}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* letters with colors for assembly */}
+          <div className="mt-3 flex flex-wrap gap-1">
+            {letters.map((l) => (
+              <span
+                key={l.position}
+                className="flex h-9 w-9 items-center justify-center rounded-md text-base font-bold shadow"
+                style={{
+                  background: l.keycap_colors?.key_color ?? "#888",
+                  color: l.keycap_colors?.text_color ?? "#fff",
+                }}
+                title={l.keycap_colors?.name ?? ""}
+              >
+                {l.char}
+              </span>
+            ))}
+          </div>
 
-      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-        <Info label="ฐาน" value={baseLabel(order)} />
-        <Info label="สีฐาน" value={order.base_colors?.name ?? "-"} />
-        <Info label="ตัวห้อย" value={order.pendants?.name ?? "ไม่มี"} />
-        <Info label="ราคา" value={formatBaht(Number(order.total_price))} />
-      </dl>
+          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+            <Info label="ฐาน" value={baseLabel(order)} />
+            <Info label="สีฐาน" value={order.base_colors?.name ?? "-"} />
+            <Info label="ตัวห้อย" value={order.pendants?.name ?? "ไม่มี"} />
+            <Info label="ราคา" value={formatBaht(Number(order.total_price))} />
+          </dl>
+        </>
+      )}
       {order.note && (
         <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
           📝 {order.note}

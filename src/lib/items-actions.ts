@@ -55,6 +55,18 @@ type KeycapColorInput = {
   active?: boolean;
 };
 
+type SocialPlatformInput = {
+  id?: string;
+  name: string;
+  url_template: string;
+  hint?: string | null;
+  icon?: string | null;
+  price: number;
+  stock: number;
+  sort_order?: number;
+  active?: boolean;
+};
+
 type PendantInput = {
   id?: string;
   name: string;
@@ -125,6 +137,12 @@ export async function savePendant(input: PendantInput) {
   if (error) throw new Error(error.message);
 }
 
+export async function saveSocialPlatform(input: SocialPlatformInput) {
+  const sb = await guard();
+  const { error } = await sb.from("social_platforms").upsert(input);
+  if (error) throw new Error(error.message);
+}
+
 export async function deleteItem(
   table:
     | "base_types"
@@ -132,7 +150,8 @@ export async function deleteItem(
     | "base_colors"
     | "base_variants"
     | "keycap_colors"
-    | "pendants",
+    | "pendants"
+    | "social_platforms",
   id: string
 ) {
   const sb = await guard();
