@@ -114,6 +114,7 @@ export type OrderDetail = {
   note: string | null;
   created_at: string;
   product_type: "keycap" | "nfc";
+  layout: "horizontal" | "vertical" | null;
   nfc: { platform: string; icon: string | null; value: string; url: string } | null;
   base_size: { label: string } | null;
   base_color: { name: string; swatch: string | null } | null;

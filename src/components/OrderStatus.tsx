@@ -141,8 +141,14 @@ export function OrderStatus({ id }: { id: string }) {
           </dl>
         ) : (
           <>
-            <div className="mb-3 text-center">
-              <div className="inline-flex flex-wrap justify-center gap-1">
+            <div className="mb-3 flex justify-center">
+              <div
+                className={`inline-flex flex-wrap gap-1 ${
+                  order.layout === "vertical"
+                    ? "flex-col items-center"
+                    : "justify-center"
+                }`}
+              >
                 {order.letters.map((l) => (
                   <span
                     key={l.position}
@@ -160,6 +166,10 @@ export function OrderStatus({ id }: { id: string }) {
             <dl className="space-y-1 text-sm">
               <Row label="ข้อความ" value={order.text} />
               <Row label="ขนาดฐาน" value={order.base_size?.label ?? "-"} />
+              <Row
+                label="แนววาง"
+                value={order.layout === "vertical" ? "แนวตั้ง" : "แนวนอน"}
+              />
               <Row label="สีฐาน" value={order.base_color?.name ?? "-"} />
               <Row label="ตัวห้อย" value={order.pendant?.name ?? "ไม่มี"} />
               {order.note && <Row label="หมายเหตุ" value={order.note} />}

@@ -31,6 +31,7 @@ type BoardOrder = {
   note: string | null;
   created_at: string;
   product_type: "keycap" | "nfc";
+  layout: "horizontal" | "vertical" | null;
   base_sizes: { max_chars: number; base_types: { name: string } | null } | null;
   base_colors: { name: string; swatch: string | null } | null;
   pendants: { name: string } | null;
@@ -226,8 +227,12 @@ function OrderCard({
         </div>
       ) : (
         <>
-          {/* letters with colors for assembly */}
-          <div className="mt-3 flex flex-wrap gap-1">
+          {/* letters with colors for assembly, in the chosen orientation */}
+          <div
+            className={`mt-3 flex flex-wrap gap-1 ${
+              order.layout === "vertical" ? "flex-col items-start" : ""
+            }`}
+          >
             {letters.map((l) => (
               <span
                 key={l.position}
@@ -245,6 +250,10 @@ function OrderCard({
 
           <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
             <Info label="ฐาน" value={baseLabel(order)} />
+            <Info
+              label="แนววาง"
+              value={order.layout === "vertical" ? "แนวตั้ง" : "แนวนอน"}
+            />
             <Info label="สีฐาน" value={order.base_colors?.name ?? "-"} />
             <Info label="ตัวห้อย" value={order.pendants?.name ?? "ไม่มี"} />
             <Info label="ราคา" value={formatBaht(Number(order.total_price))} />

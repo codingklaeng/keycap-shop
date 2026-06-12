@@ -47,7 +47,7 @@ export async function cancelOrder(id: string) {
 }
 
 const BOARD_SELECT =
-  "id,queue_number,status,text,total_price,note,created_at,product_type," +
+  "id,queue_number,status,text,total_price,note,created_at,product_type,layout," +
   "base_sizes(max_chars,base_types(name)),base_colors(name,swatch),pendants(name)," +
   "order_letters(position,char,keycap_colors(name,key_color,text_color))," +
   "order_nfc(social_value,social_url,social_platforms(name,icon))";

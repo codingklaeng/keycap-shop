@@ -38,6 +38,7 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
   const [sizeId, setSizeId] = useState<string | null>(null);
   const [colorId, setColorId] = useState<string | null>(null);
   const [letterColors, setLetterColors] = useState<Record<number, string>>({});
+  const [layout, setLayout] = useState<"horizontal" | "vertical">("horizontal");
   const [pendantId, setPendantId] = useState<string | null>(
     catalog.pendants[0]?.id ?? null
   );
@@ -162,6 +163,7 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
       const { data, error: rpcError } = await sb.rpc("place_order", {
         p_base_variant_id: variant.id,
         p_pendant_id: pendant?.id ?? null,
+        p_layout: layout,
         p_letters: letters.map((l) => ({
           position: l.position,
           char: l.char,
@@ -277,6 +279,42 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
                   ไม่มีขนาดที่รองรับข้อความนี้ กรุณาลดจำนวนตัวอักษร
                 </p>
               )}
+            </div>
+
+            <div>
+              <label className="mb-2 block font-semibold">
+                แนวการจัดวางตัวหนังสือ
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    { v: "horizontal", label: "แนวนอน", demo: "flex-row" },
+                    { v: "vertical", label: "แนวตั้ง", demo: "flex-col" },
+                  ] as const
+                ).map((o) => (
+                  <button
+                    key={o.v}
+                    onClick={() => setLayout(o.v)}
+                    className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition ${
+                      layout === o.v
+                        ? "border-primary bg-primary/5"
+                        : "border-border bg-card hover:border-primary"
+                    }`}
+                  >
+                    <span className={`flex ${o.demo} gap-0.5`}>
+                      {["A", "B", "C"].map((c) => (
+                        <span
+                          key={c}
+                          className="flex h-4 w-4 items-center justify-center rounded-sm bg-foreground text-[8px] font-bold text-background"
+                        >
+                          {c}
+                        </span>
+                      ))}
+                    </span>
+                    <span className="font-medium">{o.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </section>
         )}
@@ -420,8 +458,12 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
         {step === 4 && (
           <section className="space-y-4">
             <div className="rounded-xl border border-border bg-card p-4">
-              <div className="mb-3 text-center">
-                <div className="inline-flex flex-wrap justify-center gap-1">
+              <div className="mb-3 flex justify-center">
+                <div
+                  className={`inline-flex flex-wrap gap-1 ${
+                    layout === "vertical" ? "flex-col items-center" : "justify-center"
+                  }`}
+                >
                   {letters.map((l) => {
                     const c = catalog.keycapColors.find(
                       (k) => k.id === l.keycap_color_id
@@ -449,6 +491,7 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
                     size ? size.max_chars + " ช่อง" : "-"
                   }`}
                 />
+                <Row label="แนววาง" value={layout === "vertical" ? "แนวตั้ง" : "แนวนอน"} />
                 <Row label="สีฐาน" value={baseColor?.name ?? "-"} />
                 <Row label="ตัวห้อย" value={pendant ? pendant.name : "ไม่มี"} />
               </dl>
