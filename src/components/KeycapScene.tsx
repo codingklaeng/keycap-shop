@@ -22,17 +22,22 @@ function emojiFor(name: string | null): string | null {
   return "🧷";
 }
 
-function makeTexture(text: string, color: string, bold = true): THREE.CanvasTexture {
+function makeTexture(
+  text: string,
+  color: string,
+  bold = true,
+  fontPx = 170
+): THREE.CanvasTexture {
   const s = 256;
   const c = document.createElement("canvas");
   c.width = c.height = s;
   const ctx = c.getContext("2d")!;
   ctx.clearRect(0, 0, s, s);
   ctx.fillStyle = color;
-  ctx.font = `${bold ? "bold " : ""}170px system-ui, sans-serif`;
+  ctx.font = `${bold ? "bold " : ""}${fontPx}px system-ui, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(text, s / 2, s / 2 + 12);
+  ctx.fillText(text, s / 2, s / 2 + 10);
   const t = new THREE.CanvasTexture(c);
   t.anisotropy = 8;
   t.needsUpdate = true;
@@ -40,11 +45,11 @@ function makeTexture(text: string, color: string, bold = true): THREE.CanvasText
 }
 
 function Label({ char, color }: { char: string; color: string }) {
-  const tex = useMemo(() => makeTexture(char, color), [char, color]);
+  const tex = useMemo(() => makeTexture(char, color, true, 230), [char, color]);
   useEffect(() => () => tex.dispose(), [tex]);
   return (
     <mesh position={[0, 0, 0.27]}>
-      <planeGeometry args={[0.82, 0.82]} />
+      <planeGeometry args={[0.92, 0.92]} />
       <meshBasicMaterial map={tex} transparent />
     </mesh>
   );
