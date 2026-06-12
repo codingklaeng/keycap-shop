@@ -132,11 +132,28 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
     return catalog.keycapColors.filter((c) => ids.has(c.id));
   }
 
+  // pick the best size for a given text length within the current type:
+  // exact slot match first, otherwise the smallest size that still fits.
+  function autoSizeId(len: number): string | null {
+    if (len === 0) return null;
+    const cands = catalog.baseSizes.filter(
+      (s) => s.base_type_id === typeId && sizesWithVariant.has(s.id) && s.active
+    );
+    const exact = cands.find((s) => s.max_chars === len);
+    if (exact) return exact.id;
+    const fits = cands
+      .filter((s) => s.max_chars >= len)
+      .sort((a, b) => a.max_chars - b.max_chars);
+    return fits[0]?.id ?? null;
+  }
+
   function handleTextChange(v: string) {
     const upper = v.toUpperCase();
     setText(upper);
+    const gs = splitGraphemes(upper);
+
     const next: Record<number, string> = {};
-    splitGraphemes(upper).forEach((ch, i) => {
+    gs.forEach((ch, i) => {
       const opts = availability.get(ch);
       const current = letterColors[i];
       if (current && opts?.has(current)) next[i] = current;
@@ -146,6 +163,19 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
       }
     });
     setLetterColors(next);
+
+    // default-select size = number of letters (realtime as text changes)
+    const auto = autoSizeId(gs.length);
+    setSizeId(auto);
+    if (
+      auto &&
+      colorId &&
+      !catalog.baseVariants.some(
+        (vv) => vv.base_size_id === auto && vv.base_color_id === colorId
+      )
+    ) {
+      setColorId(null);
+    }
   }
 
   function chooseSize(id: string) {
