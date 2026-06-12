@@ -116,9 +116,11 @@ function Model({ letters, baseColor, layout, pendantName }: Props) {
   const gap = 1.08;
   const horizontal = layout === "horizontal";
 
+  const plateDepth = 0.8; // thicker base (was 0.25)
+  const keycapZ = plateDepth / 2 + 0.25; // keycaps sit on the front face
   const positions: [number, number, number][] = shown.map((_, i) => {
     const offset = (i - (n - 1) / 2) * gap;
-    return horizontal ? [offset, 0, 0.25] : [0, -offset, 0.25];
+    return horizontal ? [offset, 0, keycapZ] : [0, -offset, keycapZ];
   });
 
   // base plate sized to fit
@@ -141,7 +143,7 @@ function Model({ letters, baseColor, layout, pendantName }: Props) {
       </mesh>
 
       {/* base plate */}
-      <RoundedBox args={[padW, padH, 0.25]} radius={0.12} smoothness={4} position={[0, 0, 0]}>
+      <RoundedBox args={[padW, padH, plateDepth]} radius={0.14} smoothness={4} position={[0, 0, 0]}>
         <meshStandardMaterial color={baseColor ?? "#e5e7eb"} roughness={0.6} metalness={0.05} />
       </RoundedBox>
 
