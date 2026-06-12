@@ -7,7 +7,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { splitGraphemes } from "@/lib/graphemes";
 import { calcPrice, formatBaht } from "@/lib/price";
 import { saveLastOrder } from "@/components/TrackOrderButton";
-import { KeycapPreview } from "@/components/KeycapPreview";
+import { KeycapPreview3D } from "@/components/KeycapPreview3D";
 import type { Catalog, LetterChoice } from "@/lib/types";
 
 const STEPS = ["ข้อความ + ขนาด", "สีฐาน", "สีตัวอักษร", "ตัวห้อย", "ยืนยัน"];
@@ -219,8 +219,8 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
           />
         </div>
         {/* live product preview, pinned at the top */}
-        <div className="mx-auto max-w-lg px-4 py-3">
-          <KeycapPreview
+        <div className="mx-auto max-w-lg px-4 py-1">
+          <KeycapPreview3D
             letters={previewLetters}
             baseColor={baseColor?.swatch ?? null}
             layout={layout}
