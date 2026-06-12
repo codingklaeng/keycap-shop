@@ -7,6 +7,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { splitGraphemes } from "@/lib/graphemes";
 import { calcPrice, formatBaht } from "@/lib/price";
 import { saveLastOrder } from "@/components/TrackOrderButton";
+import { KeycapPreview } from "@/components/KeycapPreview";
 import type { Catalog, LetterChoice } from "@/lib/types";
 
 const STEPS = ["ข้อความ + ขนาด", "สีฐาน", "สีตัวอักษร", "ตัวห้อย", "ยืนยัน"];
@@ -93,6 +94,18 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
       )
     )
   );
+
+  // live preview letters (resolve colors for the mockup at the top)
+  const previewLetters = letters
+    .filter((l) => l.keycap_color_id)
+    .map((l) => {
+      const c = catalog.keycapColors.find((k) => k.id === l.keycap_color_id);
+      return {
+        char: l.char,
+        key: c?.key_color ?? "#9ca3af",
+        text: c?.text_color ?? "#ffffff",
+      };
+    });
 
   // sizes for the selected type that fit the text length and have a variant
   const sizeOptions = catalog.baseSizes.filter(
@@ -203,6 +216,16 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
           <div
             className="h-1 bg-primary transition-all"
             style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
+          />
+        </div>
+        {/* live product preview, pinned at the top */}
+        <div className="mx-auto max-w-lg px-4 py-3">
+          <KeycapPreview
+            letters={previewLetters}
+            baseColor={baseColor?.swatch ?? null}
+            layout={layout}
+            pendantName={pendant?.name ?? null}
+            pendantImage={pendant?.image_url ?? null}
           />
         </div>
       </header>
