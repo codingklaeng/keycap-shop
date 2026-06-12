@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { Canvas } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, RoundedBox, PerspectiveCamera } from "@react-three/drei";
 import * as THREE from "three";
 import type { PreviewLetter } from "@/components/KeycapPreview";
@@ -84,6 +84,28 @@ function EmojiCharm({ emoji, y }: { emoji: string; y: number }) {
   );
 }
 
+// Gently rocks the model left-right while spinning (so a flat keychain never
+// shows an edge-on side), and eases back to facing front when stopped.
+function SpinGroup({
+  spinning,
+  children,
+}: {
+  spinning: boolean;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<THREE.Group>(null);
+  useFrame((state) => {
+    const g = ref.current;
+    if (!g) return;
+    if (spinning) {
+      g.rotation.y = Math.sin(state.clock.elapsedTime * 1.1) * 0.55;
+    } else {
+      g.rotation.y += (0 - g.rotation.y) * 0.12; // ease to front
+    }
+  });
+  return <group ref={ref}>{children}</group>;
+}
+
 function Model({ letters, baseColor, layout, pendantName }: Props) {
   const ghost = letters.length === 0;
   const shown: PreviewLetter[] = ghost
@@ -135,26 +157,47 @@ function Model({ letters, baseColor, layout, pendantName }: Props) {
 }
 
 export function KeycapScene(props: Props) {
+  const [spinning, setSpinning] = useState(true);
+
   // distance to frame the model
   const n = Math.max(props.letters.length, 3);
   const extent = props.layout === "horizontal" ? n * 1.08 + 1 : n * 1.08 + 2.5;
   const dist = Math.max(6, extent * 1.15);
+  // slightly elevated 3/4 hero view (depth reads, text stays legible at rest)
+  const camPos: [number, number, number] = [dist * 0.16, dist * 0.16, dist * 0.97];
 
   return (
-    <Canvas dpr={[1, 1.8]} gl={{ alpha: true, antialias: true }} style={{ height: 170 }}>
-      <PerspectiveCamera makeDefault position={[0, 0, dist]} fov={32} />
-      <ambientLight intensity={0.75} />
-      <directionalLight position={[4, 6, 6]} intensity={1.15} />
-      <directionalLight position={[-4, -2, 3]} intensity={0.35} />
-      <Model {...props} />
-      <OrbitControls
-        enableZoom={false}
-        enablePan={false}
-        autoRotate
-        autoRotateSpeed={1.4}
-        minPolarAngle={Math.PI / 3}
-        maxPolarAngle={(2 * Math.PI) / 3}
-      />
-    </Canvas>
+    <div className="relative">
+      <Canvas dpr={[1, 1.8]} gl={{ alpha: true, antialias: true }} style={{ height: 180 }}>
+        <PerspectiveCamera makeDefault position={camPos} fov={32} />
+        <ambientLight intensity={0.75} />
+        <directionalLight position={[4, 6, 6]} intensity={1.15} />
+        <directionalLight position={[-4, -2, 3]} intensity={0.35} />
+        <SpinGroup spinning={spinning}>
+          <Model {...props} />
+        </SpinGroup>
+        {/* manual inspection enabled only when not auto-spinning */}
+        <OrbitControls
+          enabled={!spinning}
+          enableZoom={false}
+          enablePan={false}
+          minPolarAngle={Math.PI / 4}
+          maxPolarAngle={(3 * Math.PI) / 4}
+        />
+      </Canvas>
+
+      <button
+        type="button"
+        onClick={() => setSpinning((s) => !s)}
+        className="absolute right-2 top-2 rounded-full border border-border bg-card/80 px-3 py-1 text-xs font-medium text-muted shadow-sm backdrop-blur transition hover:text-foreground"
+      >
+        {spinning ? "⏸ หยุดหมุน" : "↻ หมุน"}
+      </button>
+      {!spinning && (
+        <span className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[10px] text-muted">
+          ลากเพื่อหมุนดูรอบด้าน
+        </span>
+      )}
+    </div>
   );
 }
