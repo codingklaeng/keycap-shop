@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { logout } from "@/lib/admin-actions";
 
-export function AdminNav({ active }: { active: "board" | "items" | "summary" }) {
+export function AdminNav({
+  active,
+}: {
+  active: "board" | "items" | "summary" | "letters";
+}) {
   const link = (active2: string) =>
     `rounded-lg px-3 py-1.5 text-sm font-medium ${
       active === active2 ? "bg-primary text-primary-foreground" : "text-muted"
@@ -18,6 +22,9 @@ export function AdminNav({ active }: { active: "board" | "items" | "summary" }) 
           </Link>
           <Link href="/admin/summary" className={link("summary")}>
             สรุปยอด
+          </Link>
+          <Link href="/admin/letters" className={link("letters")}>
+            อันดับตัวอักษร
           </Link>
         </div>
         <form action={logout}>
