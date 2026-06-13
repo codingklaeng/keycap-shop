@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { formatBaht } from "@/lib/price";
 import { saveLastOrder } from "@/components/TrackOrderButton";
+import { NfcPreview3D } from "@/components/NfcPreview3D";
 import type { SocialPlatform } from "@/lib/types";
 
 const ERROR_TH: Record<string, string> = {
@@ -102,6 +103,15 @@ export function NfcWizard({ platforms }: { platforms: SocialPlatform[] }) {
           </Link>
           <div className="text-sm font-medium">พวงกุญแจ NFC</div>
           <div className="w-10" />
+        </div>
+        {/* live 3D preview: tag + phone tapping to open the app */}
+        <div className="mx-auto max-w-lg px-4 pb-1">
+          <NfcPreview3D
+            name={platform?.name ?? null}
+            icon={platform?.icon ?? null}
+            imageUrl={platform?.image_url ?? null}
+            value={value}
+          />
         </div>
       </header>
 
