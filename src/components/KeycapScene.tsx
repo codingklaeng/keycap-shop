@@ -148,14 +148,14 @@ function Model({ letters, baseColor, layout, pendantName }: Props) {
 
   return (
     <group>
-      {/* keyring */}
+      {/* keyring — tinted to the base color */}
       <mesh position={ringPos}>
         <torusGeometry args={[0.22, 0.06, 14, 28]} />
-        <meshStandardMaterial color="#9ca3af" metalness={0.9} roughness={0.25} />
+        <meshStandardMaterial color={baseColor ?? "#9ca3af"} metalness={0.45} roughness={0.3} />
       </mesh>
       <mesh position={connPos} rotation={connRot}>
         <cylinderGeometry args={[0.04, 0.04, 0.3, 10]} />
-        <meshStandardMaterial color="#9ca3af" metalness={0.9} roughness={0.25} />
+        <meshStandardMaterial color={baseColor ?? "#9ca3af"} metalness={0.45} roughness={0.3} />
       </mesh>
 
       {/* base plate */}
