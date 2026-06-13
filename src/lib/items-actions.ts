@@ -61,6 +61,7 @@ type SocialPlatformInput = {
   url_template: string;
   hint?: string | null;
   icon?: string | null;
+  image_url?: string | null;
   price: number;
   stock: number;
   sort_order?: number;

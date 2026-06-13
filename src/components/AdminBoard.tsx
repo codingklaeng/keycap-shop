@@ -19,7 +19,7 @@ type BoardLetter = {
 type BoardNfc = {
   social_value: string;
   social_url: string;
-  social_platforms: { name: string; icon: string | null } | null;
+  social_platforms: { name: string; icon: string | null; image_url: string | null } | null;
 };
 
 type BoardOrder = {
@@ -210,13 +210,19 @@ function OrderCard({
       {isNfc ? (
         /* NFC: show platform + handle + generated url to write to the tag */
         <div className="mt-3 space-y-2">
+          <div className="flex items-center gap-2 font-medium">
+            {nfc?.social_platforms?.image_url ? (
+              <img
+                src={nfc.social_platforms.image_url}
+                alt=""
+                className="h-6 w-6 rounded object-cover"
+              />
+            ) : (
+              <span className="text-lg">{nfc?.social_platforms?.icon ?? "🔗"}</span>
+            )}
+            {nfc?.social_platforms?.name ?? "-"}
+          </div>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-            <Info
-              label="แพลตฟอร์ม"
-              value={`${nfc?.social_platforms?.icon ?? ""} ${
-                nfc?.social_platforms?.name ?? "-"
-              }`.trim()}
-            />
             <Info label="ราคา" value={formatBaht(Number(order.total_price))} />
             <Info label="ช่อง/ID" value={nfc?.social_value ?? order.text} />
           </dl>

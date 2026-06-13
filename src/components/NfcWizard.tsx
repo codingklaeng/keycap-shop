@@ -121,7 +121,15 @@ export function NfcWizard({ platforms }: { platforms: SocialPlatform[] }) {
                       : "border-border bg-card hover:border-primary"
                   }`}
                 >
-                  <div className="text-2xl">{p.icon ?? "🔗"}</div>
+                  {p.image_url ? (
+                    <img
+                      src={p.image_url}
+                      alt={p.name}
+                      className="h-10 w-10 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <div className="text-2xl">{p.icon ?? "🔗"}</div>
+                  )}
                   <div className="mt-1 font-medium">{p.name}</div>
                   <div className="text-sm font-semibold text-primary">
                     {formatBaht(p.price)}

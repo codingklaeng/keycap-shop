@@ -58,6 +58,7 @@ export type SocialPlatform = {
   url_template: string;
   hint: string | null;
   icon: string | null;
+  image_url: string | null;
   price: number;
   stock: number;
   sort_order: number;
@@ -115,7 +116,13 @@ export type OrderDetail = {
   created_at: string;
   product_type: "keycap" | "nfc";
   layout: "horizontal" | "vertical" | null;
-  nfc: { platform: string; icon: string | null; value: string; url: string } | null;
+  nfc: {
+    platform: string;
+    icon: string | null;
+    image: string | null;
+    value: string;
+    url: string;
+  } | null;
   base_size: { label: string } | null;
   base_color: { name: string; swatch: string | null } | null;
   pendant: { name: string } | null;

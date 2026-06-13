@@ -132,10 +132,21 @@ export function OrderStatus({ id }: { id: string }) {
         {order.product_type === "nfc" ? (
           <dl className="space-y-1 text-sm">
             <Row label="สินค้า" value="พวงกุญแจ NFC" />
-            <Row
-              label="แพลตฟอร์ม"
-              value={`${order.nfc?.icon ?? ""} ${order.nfc?.platform ?? "-"}`.trim()}
-            />
+            <div className="flex justify-between gap-4">
+              <dt className="shrink-0 text-muted">แพลตฟอร์ม</dt>
+              <dd className="flex items-center gap-2 font-medium">
+                {order.nfc?.image ? (
+                  <img
+                    src={order.nfc.image}
+                    alt=""
+                    className="h-5 w-5 rounded object-cover"
+                  />
+                ) : (
+                  <span>{order.nfc?.icon ?? ""}</span>
+                )}
+                {order.nfc?.platform ?? "-"}
+              </dd>
+            </div>
             <Row label="ช่อง/ID" value={order.nfc?.value ?? order.text} />
             {order.note && <Row label="หมายเหตุ" value={order.note} />}
           </dl>

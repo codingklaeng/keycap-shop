@@ -126,6 +126,7 @@ function PlatformsTab({
       url_template: String(fd.get("url_template")),
       hint: str(fd, "hint"),
       icon: str(fd, "icon"),
+      image_url: str(fd, "image_url"),
       price: num(fd, "price"),
       stock: num(fd, "stock"),
       sort_order: num(fd, "sort_order"),
@@ -142,12 +143,16 @@ function PlatformsTab({
       <Card>
         <p className="mb-2 font-semibold">เพิ่มแพลตฟอร์มใหม่</p>
         <form action={(fd) => save(fd)} className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <input name="icon" placeholder="ไอคอน (อิโมจิ)" className={inp} />
           <input name="name" placeholder="ชื่อ เช่น Facebook" required className={inp} />
           <input name="url_template" placeholder="https://facebook.com/{id}" required className={`${inp} sm:col-span-2`} />
           <input name="hint" placeholder="คำใบ้ช่องกรอก" className={inp} />
           <input name="price" type="number" placeholder="ราคา" defaultValue={0} className={inp} />
           <input name="stock" type="number" placeholder="สต็อก" defaultValue={0} className={inp} />
+          <div className="flex items-center gap-2 sm:col-span-2">
+            <span className="text-xs text-muted">ไอคอน:</span>
+            <ImageUpload folder="platform" />
+            <input name="icon" placeholder="หรืออิโมจิ" className={`${inp} w-24`} />
+          </div>
           <input type="hidden" name="sort_order" value={platforms.length + 1} />
           <input type="hidden" name="active" value="on" />
           <button className={btnAdd}>เพิ่ม</button>
@@ -156,12 +161,16 @@ function PlatformsTab({
       {platforms.map((p) => (
         <Card key={p.id}>
           <form action={(fd) => save(fd, p.id)} className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <input name="icon" defaultValue={p.icon ?? ""} placeholder="ไอคอน" className={inp} />
             <input name="name" defaultValue={p.name} className={inp} />
             <input name="url_template" defaultValue={p.url_template} className={`${inp} sm:col-span-2`} />
             <input name="hint" defaultValue={p.hint ?? ""} placeholder="คำใบ้" className={inp} />
             <input name="price" type="number" defaultValue={p.price} className={inp} />
             <input name="stock" type="number" defaultValue={p.stock} className={inp} />
+            <div className="flex items-center gap-2 sm:col-span-2">
+              <span className="text-xs text-muted">ไอคอน:</span>
+              <ImageUpload folder="platform" initialUrl={p.image_url} />
+              <input name="icon" defaultValue={p.icon ?? ""} placeholder="หรืออิโมจิ" className={`${inp} w-24`} />
+            </div>
             <input type="hidden" name="sort_order" defaultValue={p.sort_order} />
             <label className="flex items-center gap-1 text-sm">
               <input type="checkbox" name="active" defaultChecked={p.active} /> เปิดขาย
