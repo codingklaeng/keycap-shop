@@ -163,25 +163,51 @@ function Model({ letters, baseColor, layout, pendantName }: Props) {
   );
 }
 
+const GAP = 1.08;
+const FOV = 32;
+
+// Bounding metrics of the model so the camera can frame it fully (incl. the
+// keyring above and the pendant below), for any layout / text length.
+function metrics(layout: "horizontal" | "vertical", n: number, hasPendant: boolean) {
+  const padH = layout === "horizontal" ? 1.5 : n * GAP + 0.5;
+  const padW = layout === "horizontal" ? n * GAP + 0.5 : 1.5;
+  const plateTop = padH / 2;
+  const topY = plateTop + 0.63; // ring outer edge
+  const bottomY = hasPendant ? -plateTop - 1.05 : -plateTop - 0.05;
+  return {
+    H: topY - bottomY,
+    W: layout === "horizontal" ? padW + 0.6 : 1.6,
+    Yc: (topY + bottomY) / 2,
+  };
+}
+
 export function KeycapScene(props: Props) {
   const [spinning, setSpinning] = useState(true);
 
-  // distance to frame the model
-  const n = Math.max(props.letters.length, 3);
-  const extent = props.layout === "horizontal" ? n * 1.08 + 1 : n * 1.08 + 2.5;
-  const dist = Math.max(6, extent * 1.15);
-  // slightly elevated 3/4 hero view (depth reads, text stays legible at rest)
-  const camPos: [number, number, number] = [dist * 0.16, dist * 0.16, dist * 0.97];
+  const n = props.letters.length === 0 ? 3 : props.letters.length;
+  const hasPendant = emojiFor(props.pendantName) !== null;
+  const { H, W, Yc } = metrics(props.layout, n, hasPendant);
+
+  // distance that fits both the height and the width (with margin)
+  const tanHalf = Math.tan((FOV * Math.PI) / 360);
+  const aspect = 1.7; // conservative (narrow phones) so width never clips
+  const distH = H / 2 / tanHalf;
+  const distW = W / 2 / (tanHalf * aspect);
+  const dist = Math.max(distH, distW, 4.5) * 1.18;
+  const camPos: [number, number, number] = [dist * 0.12, dist * 0.12, dist * 0.95];
 
   return (
     <div className="relative">
-      <Canvas dpr={[1, 1.8]} gl={{ alpha: true, antialias: true }} style={{ height: 180 }}>
-        <PerspectiveCamera makeDefault position={camPos} fov={32} />
+      <Canvas dpr={[1, 1.8]} gl={{ alpha: true, antialias: true }} style={{ height: 185 }}>
+        <PerspectiveCamera makeDefault position={camPos} fov={FOV} />
         <ambientLight intensity={0.75} />
         <directionalLight position={[4, 6, 6]} intensity={1.15} />
         <directionalLight position={[-4, -2, 3]} intensity={0.35} />
         <SpinGroup spinning={spinning}>
-          <Model {...props} />
+          {/* re-center the model vertically so it never clips top/bottom */}
+          <group position={[0, -Yc, 0]}>
+            <Model {...props} />
+          </group>
         </SpinGroup>
         {/* manual inspection enabled only when not auto-spinning */}
         <OrbitControls
