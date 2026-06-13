@@ -9,6 +9,7 @@ export type NfcSceneProps = {
   name: string | null;
   icon: string | null;
   imageUrl: string | null;
+  brandColor: string | null;
   value: string;
 };
 
@@ -60,16 +61,18 @@ function usePlatformTexture(url: string | null, emoji: string | null) {
   return obj.t;
 }
 
-function Model({ name, icon, imageUrl, value }: NfcSceneProps) {
+function Model({ name, icon, imageUrl, value, brandColor }: NfcSceneProps) {
   const iconTex = usePlatformTexture(imageUrl, icon);
   const screenIconTex = usePlatformTexture(imageUrl, icon);
+  const brand = brandColor ?? PRIMARY;
 
   const phone = useRef<THREE.Group>(null);
   const idle = useRef<THREE.Group>(null);
-  const app = useRef<THREE.Group>(null);
+  const splash = useRef<THREE.Group>(null);
+  const feed = useRef<THREE.Group>(null);
   const ripples = [useRef<THREE.Mesh>(null), useRef<THREE.Mesh>(null), useRef<THREE.Mesh>(null)];
 
-  const CYCLE = 3.6;
+  const CYCLE = 4.2;
 
   useFrame((state) => {
     const t = state.clock.elapsedTime % CYCLE;
@@ -77,18 +80,22 @@ function Model({ name, icon, imageUrl, value }: NfcSceneProps) {
 
     // phone X: 1.9 (rest) -> 0.35 (tapping) -> back
     let x = 1.9;
-    if (p < 0.3) x = 1.9 - (1.9 - 0.35) * easeOut(p / 0.3);
-    else if (p < 0.82) x = 0.35;
-    else x = 0.35 + (1.9 - 0.35) * easeIn((p - 0.82) / 0.18);
+    if (p < 0.26) x = 1.9 - (1.9 - 0.35) * easeOut(p / 0.26);
+    else if (p < 0.84) x = 0.35;
+    else x = 0.35 + (1.9 - 0.35) * easeIn((p - 0.84) / 0.16);
     if (phone.current) {
       phone.current.position.x = x;
       phone.current.position.y = -0.1 + Math.sin(state.clock.elapsedTime * 1.6) * 0.05;
       phone.current.rotation.y = -0.45;
     }
 
-    const opened = p >= 0.32 && p < 0.85;
+    // opened window: splash first, then feed (like launching the real app)
+    const opened = p >= 0.3 && p < 0.86;
+    const showSplash = opened && p < 0.46;
+    const showFeed = opened && p >= 0.46;
     if (idle.current) idle.current.visible = !opened;
-    if (app.current) app.current.visible = opened;
+    if (splash.current) splash.current.visible = showSplash;
+    if (feed.current) feed.current.visible = showFeed;
 
     // NFC ripples during tap
     ripples.forEach((r, i) => {
@@ -153,22 +160,57 @@ function Model({ name, icon, imageUrl, value }: NfcSceneProps) {
           </mesh>
         </group>
 
-        {/* app screen (opened) */}
-        <group ref={app} position={[0, 0, 0.07]} visible={false}>
+        {/* splash screen — brand color + logo (like an app launch) */}
+        <group ref={splash} position={[0, 0, 0.07]} visible={false}>
           <mesh>
             <planeGeometry args={[0.86, 1.78]} />
-            <meshBasicMaterial color="#ffffff" />
+            <meshBasicMaterial color={brand} />
           </mesh>
-          {/* app header bar */}
-          <mesh position={[0, 0.8, 0.01]}>
-            <planeGeometry args={[0.86, 0.22]} />
-            <meshBasicMaterial color={PRIMARY} />
-          </mesh>
-          {/* app icon */}
-          <mesh position={[0, 0.1, 0.02]}>
-            <planeGeometry args={[0.6, 0.6]} />
+          <mesh position={[0, 0.05, 0.01]}>
+            <planeGeometry args={[0.62, 0.62]} />
             <meshBasicMaterial map={screenIconTex} transparent />
           </mesh>
+        </group>
+
+        {/* feed screen — brand-tinted header + mock content */}
+        <group ref={feed} position={[0, 0, 0.07]} visible={false}>
+          <mesh>
+            <planeGeometry args={[0.86, 1.78]} />
+            <meshBasicMaterial color="#f3f4f6" />
+          </mesh>
+          {/* header bar */}
+          <mesh position={[0, 0.82, 0.01]}>
+            <planeGeometry args={[0.86, 0.2]} />
+            <meshBasicMaterial color={brand} />
+          </mesh>
+          <mesh position={[-0.3, 0.82, 0.02]}>
+            <planeGeometry args={[0.13, 0.13]} />
+            <meshBasicMaterial map={screenIconTex} transparent />
+          </mesh>
+          {/* two feed cards */}
+          {[0.45, -0.05].map((cy, k) => (
+            <group key={k} position={[0, cy, 0.01]}>
+              <mesh>
+                <planeGeometry args={[0.78, 0.42]} />
+                <meshBasicMaterial color="#ffffff" />
+              </mesh>
+              {/* avatar */}
+              <mesh position={[-0.28, 0.12, 0.01]}>
+                <circleGeometry args={[0.06, 24]} />
+                <meshBasicMaterial color={brand} />
+              </mesh>
+              {/* name + line */}
+              <mesh position={[0.04, 0.15, 0.01]}>
+                <planeGeometry args={[0.4, 0.035]} />
+                <meshBasicMaterial color="#9ca3af" />
+              </mesh>
+              {/* image block tinted with brand */}
+              <mesh position={[0, -0.06, 0.01]}>
+                <planeGeometry args={[0.66, 0.18]} />
+                <meshBasicMaterial color={brand} transparent opacity={0.28} />
+              </mesh>
+            </group>
+          ))}
         </group>
       </group>
     </group>

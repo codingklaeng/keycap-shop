@@ -127,6 +127,7 @@ function PlatformsTab({
       hint: str(fd, "hint"),
       icon: str(fd, "icon"),
       image_url: str(fd, "image_url"),
+      brand_color: str(fd, "brand_color"),
       price: num(fd, "price"),
       stock: num(fd, "stock"),
       sort_order: num(fd, "sort_order"),
@@ -152,6 +153,8 @@ function PlatformsTab({
             <span className="text-xs text-muted">ไอคอน:</span>
             <ImageUpload folder="platform" />
             <input name="icon" placeholder="หรืออิโมจิ" className={`${inp} w-24`} />
+            <span className="text-xs text-muted">สีแบรนด์:</span>
+            <input name="brand_color" type="color" defaultValue="#6d28d9" className="h-9 w-10 rounded-lg border border-border" />
           </div>
           <input type="hidden" name="sort_order" value={platforms.length + 1} />
           <input type="hidden" name="active" value="on" />
@@ -170,6 +173,8 @@ function PlatformsTab({
               <span className="text-xs text-muted">ไอคอน:</span>
               <ImageUpload folder="platform" initialUrl={p.image_url} />
               <input name="icon" defaultValue={p.icon ?? ""} placeholder="หรืออิโมจิ" className={`${inp} w-24`} />
+              <span className="text-xs text-muted">สีแบรนด์:</span>
+              <input name="brand_color" type="color" defaultValue={p.brand_color ?? "#6d28d9"} className="h-9 w-10 rounded-lg border border-border" />
             </div>
             <input type="hidden" name="sort_order" defaultValue={p.sort_order} />
             <label className="flex items-center gap-1 text-sm">

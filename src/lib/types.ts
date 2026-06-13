@@ -59,6 +59,7 @@ export type SocialPlatform = {
   hint: string | null;
   icon: string | null;
   image_url: string | null;
+  brand_color: string | null;
   price: number;
   stock: number;
   sort_order: number;

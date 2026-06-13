@@ -110,6 +110,7 @@ export function NfcWizard({ platforms }: { platforms: SocialPlatform[] }) {
             name={platform?.name ?? null}
             icon={platform?.icon ?? null}
             imageUrl={platform?.image_url ?? null}
+            brandColor={platform?.brand_color ?? null}
             value={value}
           />
         </div>

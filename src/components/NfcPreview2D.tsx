@@ -4,6 +4,7 @@ export type NfcPreviewProps = {
   name: string | null;
   icon: string | null;
   imageUrl: string | null;
+  brandColor: string | null;
   value: string;
 };
 
