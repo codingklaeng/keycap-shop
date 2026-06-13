@@ -135,14 +135,25 @@ function Model({ letters, baseColor, layout, pendantName }: Props) {
 
   const emoji = emojiFor(pendantName);
 
+  // keyring: top-center for vertical, left-center for horizontal
+  const ringPos: [number, number, number] = horizontal
+    ? [-padW / 2 - 0.35, 0, 0]
+    : [0, plateTop + 0.35, 0];
+  const connPos: [number, number, number] = horizontal
+    ? [-padW / 2 - 0.08, 0, 0]
+    : [0, plateTop + 0.08, 0];
+  const connRot: [number, number, number] = horizontal
+    ? [0, 0, Math.PI / 2]
+    : [0, 0, 0];
+
   return (
     <group>
       {/* keyring */}
-      <mesh position={[0, plateTop + 0.35, 0]}>
+      <mesh position={ringPos}>
         <torusGeometry args={[0.22, 0.06, 14, 28]} />
         <meshStandardMaterial color="#9ca3af" metalness={0.9} roughness={0.25} />
       </mesh>
-      <mesh position={[0, plateTop + 0.08, 0]}>
+      <mesh position={connPos} rotation={connRot}>
         <cylinderGeometry args={[0.04, 0.04, 0.3, 10]} />
         <meshStandardMaterial color="#9ca3af" metalness={0.9} roughness={0.25} />
       </mesh>
@@ -167,17 +178,25 @@ const GAP = 1.08;
 const FOV = 32;
 
 // Bounding metrics of the model so the camera can frame it fully (incl. the
-// keyring above and the pendant below), for any layout / text length.
+// keyring and the pendant below), for any layout / text length. The ring sits
+// on top for vertical and on the left for horizontal.
 function metrics(layout: "horizontal" | "vertical", n: number, hasPendant: boolean) {
-  const padH = layout === "horizontal" ? 1.5 : n * GAP + 0.5;
-  const padW = layout === "horizontal" ? n * GAP + 0.5 : 1.5;
+  const horizontal = layout === "horizontal";
+  const padH = horizontal ? 1.5 : n * GAP + 0.5;
+  const padW = horizontal ? n * GAP + 0.5 : 1.5;
   const plateTop = padH / 2;
-  const topY = plateTop + 0.63; // ring outer edge
-  const bottomY = hasPendant ? -plateTop - 1.05 : -plateTop - 0.05;
+  const ring = 0.63; // ring reach beyond the plate edge
+
+  const maxY = horizontal ? plateTop : plateTop + ring;
+  const minY = hasPendant ? -plateTop - 1.05 : -plateTop - 0.05;
+  const minX = horizontal ? -padW / 2 - ring : -padW / 2;
+  const maxX = padW / 2;
+
   return {
-    H: topY - bottomY,
-    W: layout === "horizontal" ? padW + 0.6 : 1.6,
-    Yc: (topY + bottomY) / 2,
+    H: maxY - minY,
+    W: maxX - minX,
+    Xc: (maxX + minX) / 2,
+    Yc: (maxY + minY) / 2,
   };
 }
 
@@ -186,7 +205,7 @@ export function KeycapScene(props: Props) {
 
   const n = props.letters.length === 0 ? 3 : props.letters.length;
   const hasPendant = emojiFor(props.pendantName) !== null;
-  const { H, W, Yc } = metrics(props.layout, n, hasPendant);
+  const { H, W, Xc, Yc } = metrics(props.layout, n, hasPendant);
 
   // distance that fits both the height and the width (with margin)
   const tanHalf = Math.tan((FOV * Math.PI) / 360);
@@ -204,8 +223,8 @@ export function KeycapScene(props: Props) {
         <directionalLight position={[4, 6, 6]} intensity={1.15} />
         <directionalLight position={[-4, -2, 3]} intensity={0.35} />
         <SpinGroup spinning={spinning}>
-          {/* re-center the model vertically so it never clips top/bottom */}
-          <group position={[0, -Yc, 0]}>
+          {/* re-center the model so it never clips and spins about its center */}
+          <group position={[-Xc, -Yc, 0]}>
             <Model {...props} />
           </group>
         </SpinGroup>
