@@ -86,6 +86,15 @@ export function VoiceSettingsPanel({ onClose }: { onClose: () => void }) {
         className="mb-4 w-full"
       />
 
+      <label className="mb-3 flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={s.useName}
+          onChange={(e) => update({ useName: e.target.checked })}
+        />
+        เรียกชื่อลูกค้าด้วย (ถ้าป้อนไว้) — เช่น &quot;คุณดวง คิวที่...&quot;
+      </label>
+
       <label className="mb-1 block text-sm text-muted">
         คำลงท้าย (ให้เข้ากับเสียง)
       </label>
@@ -117,7 +126,7 @@ export function VoiceSettingsPanel({ onClose }: { onClose: () => void }) {
           🔈 ทดสอบเสียง
         </button>
         <button
-          onClick={() => update({ voiceURI: null, rate: 0.95, pitch: 1, particle: "ค่ะ" })}
+          onClick={() => update({ voiceURI: null, rate: 0.95, pitch: 1, particle: "ค่ะ", useName: true })}
           className="rounded-lg border border-border px-4 py-2 text-sm text-muted"
         >
           รีเซ็ต

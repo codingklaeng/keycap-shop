@@ -42,6 +42,7 @@ export type VoiceSettings = {
   rate: number;
   pitch: number;
   particle: string; // คำลงท้าย: "ค่ะ" | "ครับ" | ""
+  useName: boolean; // เรียกชื่อลูกค้าด้วยไหม (ถ้ามี)
 };
 const SETTINGS_KEY = "keycap_voice";
 const DEFAULT_SETTINGS: VoiceSettings = {
@@ -49,6 +50,7 @@ const DEFAULT_SETTINGS: VoiceSettings = {
   rate: 0.95,
   pitch: 1,
   particle: "ค่ะ",
+  useName: true,
 };
 
 export function getVoiceSettings(): VoiceSettings {
@@ -60,6 +62,7 @@ export function getVoiceSettings(): VoiceSettings {
       rate: typeof r.rate === "number" ? r.rate : DEFAULT_SETTINGS.rate,
       pitch: typeof r.pitch === "number" ? r.pitch : DEFAULT_SETTINGS.pitch,
       particle: typeof r.particle === "string" ? r.particle : DEFAULT_SETTINGS.particle,
+      useName: typeof r.useName === "boolean" ? r.useName : DEFAULT_SETTINGS.useName,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -103,9 +106,10 @@ function speak(text: string) {
 /** Speak a sample using the current settings (for the settings panel). */
 export function testVoice() {
   chime();
-  const p = getVoiceSettings().particle;
+  const s = getVoiceSettings();
+  const namePart = s.useName ? "คุณ ตัวอย่าง " : "";
   window.setTimeout(
-    () => speak(`ทดสอบเสียงเรียกคิว เชิญคิว เอ หนึ่ง รับสินค้าได้${p}`),
+    () => speak(`ทดสอบเสียง ${namePart}คิวที่ เอ หนึ่ง รับสินค้าด้วย${s.particle}`),
     380
   );
 }
@@ -118,9 +122,9 @@ function spell(q: string): string {
 /** Chime, then announce the queue number + customer name. */
 export function announceQueue(queueNumber: string, name?: string | null) {
   chime();
-  const who = name ? ` คุณ ${name}` : "";
-  const p = getVoiceSettings().particle;
-  const text = `เชิญคิว ${spell(queueNumber)}${who} รับสินค้าได้${p}`;
+  const s = getVoiceSettings();
+  const namePart = s.useName && name ? `คุณ ${name} ` : "";
+  const text = `${namePart}คิวที่ ${spell(queueNumber)} รับสินค้าด้วย${s.particle}`;
   // small delay so the chime is heard before speech
   window.setTimeout(() => speak(text), 380);
 }
