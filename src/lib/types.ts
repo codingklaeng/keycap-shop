@@ -117,6 +117,7 @@ export type OrderDetail = {
   created_at: string;
   product_type: "keycap" | "nfc";
   layout: "horizontal" | "vertical" | null;
+  customer_name: string | null;
   nfc: {
     platform: string;
     icon: string | null;

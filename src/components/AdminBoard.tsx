@@ -25,6 +25,7 @@ type BoardNfc = {
 type BoardOrder = {
   id: string;
   queue_number: string;
+  queue_date: string;
   status: OrderStatus;
   text: string;
   total_price: number;
@@ -32,6 +33,8 @@ type BoardOrder = {
   created_at: string;
   product_type: "keycap" | "nfc";
   layout: "horizontal" | "vertical" | null;
+  customer_name: string | null;
+  customer_contact: string | null;
   base_sizes: { max_chars: number; base_types: { name: string } | null } | null;
   base_colors: { name: string; swatch: string | null } | null;
   pendants: { name: string } | null;
@@ -141,6 +144,7 @@ export function AdminBoard({ today }: { today: string }) {
           <OrderCard
             key={o.id}
             order={o}
+            today={today}
             busy={busy === o.id}
             onAdvance={changeStatus}
             onCancel={(id) => cancel(id)}
@@ -173,11 +177,13 @@ export function AdminBoard({ today }: { today: string }) {
 
 function OrderCard({
   order,
+  today,
   busy,
   onAdvance,
   onCancel,
 }: {
   order: BoardOrder;
+  today: string;
   busy: boolean;
   onAdvance: (id: string, to: OrderStatus) => void;
   onCancel: (id: string) => void;
@@ -188,9 +194,14 @@ function OrderCard({
   );
   const isNfc = order.product_type === "nfc";
   const nfc = nfcOf(order);
+  const isOld = order.queue_date !== today;
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div
+      className={`rounded-xl border bg-card p-4 ${
+        isOld ? "border-amber-400" : "border-border"
+      }`}
+    >
       <div className="flex items-start justify-between">
         <div>
           <div className="text-2xl font-extrabold">{order.queue_number}</div>
@@ -201,10 +212,32 @@ function OrderCard({
             })}
           </div>
         </div>
-        <span className="rounded-full bg-background px-3 py-1 text-xs font-medium">
-          {isNfc ? "📱 NFC · " : ""}
-          {ORDER_STATUS_LABEL[order.status]}
+        <div className="flex flex-col items-end gap-1">
+          <span className="rounded-full bg-background px-3 py-1 text-xs font-medium">
+            {isNfc ? "📱 NFC · " : ""}
+            {ORDER_STATUS_LABEL[order.status]}
+          </span>
+          {isOld && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+              ⚠ ค้างรับจาก {order.queue_date}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* customer */}
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+        <span className="font-medium">
+          👤 {order.customer_name || "—"}
         </span>
+        {order.customer_contact && (
+          <a
+            href={`tel:${order.customer_contact}`}
+            className="text-primary underline"
+          >
+            📞 {order.customer_contact}
+          </a>
+        )}
       </div>
 
       {isNfc ? (

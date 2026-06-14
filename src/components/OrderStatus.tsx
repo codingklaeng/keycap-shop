@@ -132,6 +132,9 @@ export function OrderStatus({ id }: { id: string }) {
         {order.product_type === "nfc" ? (
           <dl className="space-y-1 text-sm">
             <Row label="สินค้า" value="พวงกุญแจ NFC" />
+            {order.customer_name && (
+              <Row label="ชื่อผู้รับ" value={order.customer_name} />
+            )}
             <div className="flex justify-between gap-4">
               <dt className="shrink-0 text-muted">แพลตฟอร์ม</dt>
               <dd className="flex items-center gap-2 font-medium">
@@ -175,6 +178,9 @@ export function OrderStatus({ id }: { id: string }) {
               </div>
             </div>
             <dl className="space-y-1 text-sm">
+              {order.customer_name && (
+                <Row label="ชื่อผู้รับ" value={order.customer_name} />
+              )}
               <Row label="ข้อความ" value={order.text} />
               <Row label="ขนาดฐาน" value={order.base_size?.label ?? "-"} />
               <Row

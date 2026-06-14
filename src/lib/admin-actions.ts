@@ -47,19 +47,21 @@ export async function cancelOrder(id: string) {
 }
 
 const BOARD_SELECT =
-  "id,queue_number,status,text,total_price,note,created_at,product_type,layout," +
+  "id,queue_number,queue_date,status,text,total_price,note,created_at,product_type,layout," +
+  "customer_name,customer_contact," +
   "base_sizes(max_chars,base_types(name)),base_colors(name,swatch),pendants(name)," +
   "order_letters(position,char,keycap_colors(name,key_color,text_color))," +
   "order_nfc(social_value,social_url,social_platforms(name,icon,image_url))";
 
-// Read today's orders for the shop board (service role; polled by the client).
+// Read the board: today's orders + any older order still waiting to be picked
+// up ('ready' from a previous day) so the shop can chase no-shows.
 export async function getTodayOrders(today: string) {
   if (!(await isAdmin())) throw new Error("unauthorized");
   const sb = createAdminClient();
   const { data, error } = await sb
     .from("orders")
     .select(BOARD_SELECT)
-    .eq("queue_date", today)
+    .or(`queue_date.eq.${today},status.eq.ready`)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
   return data ?? [];

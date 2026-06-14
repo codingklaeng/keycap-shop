@@ -61,6 +61,8 @@ export function NfcWizard({ platforms }: { platforms: SocialPlatform[] }) {
   const [platformId, setPlatformId] = useState<string | null>(null);
   const [value, setValue] = useState("");
   const [note, setNote] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [customerContact, setCustomerContact] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,6 +81,8 @@ export function NfcWizard({ platforms }: { platforms: SocialPlatform[] }) {
         p_platform_id: platform.id,
         p_social_value: resolved.sendValue,
         p_note: note.trim() || null,
+        p_customer_name: customerName.trim() || null,
+        p_customer_contact: customerContact.trim() || null,
       });
       if (rpcError) {
         setError(ERROR_TH[rpcError.message] ?? "เกิดข้อผิดพลาด กรุณาลองใหม่");
@@ -178,6 +182,29 @@ export function NfcWizard({ platforms }: { platforms: SocialPlatform[] }) {
                 ✓ ลิงก์ที่จะเขียนลง NFC: {resolved.url}
               </p>
             )}
+          </div>
+        )}
+
+        {platform && (
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-2 block font-semibold">ชื่อเล่นผู้รับ</label>
+              <input
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                placeholder="เช่น ฝน"
+                className="w-full rounded-xl border border-border bg-card px-4 py-3 outline-none focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-2 block font-semibold">ติดต่อ (ถ้ามี)</label>
+              <input
+                value={customerContact}
+                onChange={(e) => setCustomerContact(e.target.value)}
+                placeholder="เบอร์ / LINE"
+                className="w-full rounded-xl border border-border bg-card px-4 py-3 outline-none focus:border-primary"
+              />
+            </div>
           </div>
         )}
 
