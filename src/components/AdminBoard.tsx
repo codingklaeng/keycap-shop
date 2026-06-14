@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   updateOrderStatus,
   cancelOrder,
@@ -9,6 +9,7 @@ import {
 import { formatBaht } from "@/lib/price";
 import { ORDER_STATUS_LABEL, type OrderStatus } from "@/lib/types";
 import { CopyButton } from "@/components/CopyButton";
+import { announceQueue, primeAudio } from "@/lib/announce";
 
 type BoardLetter = {
   position: number;
@@ -69,17 +70,37 @@ export function AdminBoard({ today }: { today: string }) {
   const [orders, setOrders] = useState<BoardOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [soundOn, setSoundOn] = useState(false);
+  const announced = useRef<Set<string>>(new Set());
+  const seeded = useRef(false);
+
+  useEffect(() => {
+    try {
+      setSoundOn(localStorage.getItem("keycap_sound") === "1");
+    } catch {}
+  }, []);
 
   const load = useCallback(async () => {
     try {
-      const data = await getTodayOrders(today);
-      setOrders(data as unknown as BoardOrder[]);
+      const data = (await getTodayOrders(today)) as unknown as BoardOrder[];
+      setOrders(data);
+      // voice-announce orders that became 'ready' (skip the initial seed so
+      // already-ready orders don't all shout when the page opens)
+      for (const o of data) {
+        if (o.status === "ready" && !announced.current.has(o.id)) {
+          announced.current.add(o.id);
+          if (seeded.current && soundOn) {
+            announceQueue(o.queue_number, o.customer_name);
+          }
+        }
+      }
+      seeded.current = true;
     } catch {
       // ignore transient errors; next poll retries
     } finally {
       setLoading(false);
     }
-  }, [today]);
+  }, [today, soundOn]);
 
   useEffect(() => {
     load();
@@ -87,11 +108,25 @@ export function AdminBoard({ today }: { today: string }) {
     return () => clearInterval(t);
   }, [load]);
 
+  function toggleSound() {
+    const next = !soundOn;
+    setSoundOn(next);
+    try {
+      localStorage.setItem("keycap_sound", next ? "1" : "0");
+    } catch {}
+    if (next) primeAudio(); // unlock audio on this gesture + confirm aloud
+  }
+
   async function changeStatus(id: string, to: OrderStatus) {
     setBusy(id);
     setOrders((prev) =>
       prev.map((o) => (o.id === id ? { ...o, status: to } : o))
     );
+    if (to === "ready") {
+      const o = orders.find((x) => x.id === id);
+      announced.current.add(id);
+      if (soundOn) announceQueue(o?.queue_number ?? "", o?.customer_name ?? null);
+    }
     try {
       await updateOrderStatus(id, to);
     } catch {
@@ -126,11 +161,24 @@ export function AdminBoard({ today }: { today: string }) {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between gap-2">
         <h1 className="text-lg font-bold">คิววันนี้</h1>
-        <span className="text-sm text-muted">
-          ทั้งหมด {orders.length} · รอทำ {active.length}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted">
+            ทั้งหมด {orders.length} · รอทำ {active.length}
+          </span>
+          <button
+            onClick={toggleSound}
+            title="เสียงเรียกคิว"
+            className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
+              soundOn
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border bg-card text-muted"
+            }`}
+          >
+            {soundOn ? "🔊 เสียงเปิด" : "🔇 เสียงปิด"}
+          </button>
+        </div>
       </div>
 
       {active.length === 0 && (
@@ -148,6 +196,7 @@ export function AdminBoard({ today }: { today: string }) {
             busy={busy === o.id}
             onAdvance={changeStatus}
             onCancel={(id) => cancel(id)}
+            onAnnounce={() => announceQueue(o.queue_number, o.customer_name)}
           />
         ))}
       </div>
@@ -181,12 +230,14 @@ function OrderCard({
   busy,
   onAdvance,
   onCancel,
+  onAnnounce,
 }: {
   order: BoardOrder;
   today: string;
   busy: boolean;
   onAdvance: (id: string, to: OrderStatus) => void;
   onCancel: (id: string) => void;
+  onAnnounce: () => void;
 }) {
   const next = NEXT_ACTION[order.status];
   const letters = [...order.order_letters].sort(
@@ -313,6 +364,15 @@ function OrderCard({
             className="flex-1 rounded-xl bg-primary px-4 py-2.5 font-semibold text-primary-foreground disabled:opacity-50"
           >
             {next.label}
+          </button>
+        )}
+        {order.status === "ready" && (
+          <button
+            onClick={onAnnounce}
+            title="เรียกคิวด้วยเสียงอีกครั้ง"
+            className="rounded-xl border border-primary px-4 py-2.5 text-sm font-medium text-primary"
+          >
+            📢 เรียกซ้ำ
           </button>
         )}
         {order.status !== "ready" && (
