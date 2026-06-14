@@ -37,9 +37,19 @@ function chime() {
 }
 
 // ---- adjustable voice settings (persisted) ----
-export type VoiceSettings = { voiceURI: string | null; rate: number; pitch: number };
+export type VoiceSettings = {
+  voiceURI: string | null;
+  rate: number;
+  pitch: number;
+  particle: string; // คำลงท้าย: "ค่ะ" | "ครับ" | ""
+};
 const SETTINGS_KEY = "keycap_voice";
-const DEFAULT_SETTINGS: VoiceSettings = { voiceURI: null, rate: 0.95, pitch: 1 };
+const DEFAULT_SETTINGS: VoiceSettings = {
+  voiceURI: null,
+  rate: 0.95,
+  pitch: 1,
+  particle: "ค่ะ",
+};
 
 export function getVoiceSettings(): VoiceSettings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
@@ -49,6 +59,7 @@ export function getVoiceSettings(): VoiceSettings {
       voiceURI: r.voiceURI ?? null,
       rate: typeof r.rate === "number" ? r.rate : DEFAULT_SETTINGS.rate,
       pitch: typeof r.pitch === "number" ? r.pitch : DEFAULT_SETTINGS.pitch,
+      particle: typeof r.particle === "string" ? r.particle : DEFAULT_SETTINGS.particle,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -92,8 +103,9 @@ function speak(text: string) {
 /** Speak a sample using the current settings (for the settings panel). */
 export function testVoice() {
   chime();
+  const p = getVoiceSettings().particle;
   window.setTimeout(
-    () => speak("ทดสอบเสียงเรียกคิว เชิญคิว เอ หนึ่ง รับสินค้าได้ค่ะ"),
+    () => speak(`ทดสอบเสียงเรียกคิว เชิญคิว เอ หนึ่ง รับสินค้าได้${p}`),
     380
   );
 }
@@ -107,7 +119,8 @@ function spell(q: string): string {
 export function announceQueue(queueNumber: string, name?: string | null) {
   chime();
   const who = name ? ` คุณ ${name}` : "";
-  const text = `เชิญคิว ${spell(queueNumber)}${who} รับสินค้าได้ค่ะ`;
+  const p = getVoiceSettings().particle;
+  const text = `เชิญคิว ${spell(queueNumber)}${who} รับสินค้าได้${p}`;
   // small delay so the chime is heard before speech
   window.setTimeout(() => speak(text), 380);
 }

@@ -86,6 +86,29 @@ export function VoiceSettingsPanel({ onClose }: { onClose: () => void }) {
         className="mb-4 w-full"
       />
 
+      <label className="mb-1 block text-sm text-muted">
+        คำลงท้าย (ให้เข้ากับเสียง)
+      </label>
+      <div className="mb-4 flex gap-2">
+        {[
+          { v: "ค่ะ", label: "ค่ะ (หญิง)" },
+          { v: "ครับ", label: "ครับ (ชาย)" },
+          { v: "", label: "ไม่มี" },
+        ].map((o) => (
+          <button
+            key={o.v}
+            onClick={() => update({ particle: o.v })}
+            className={`rounded-lg border px-3 py-1.5 text-sm ${
+              s.particle === o.v
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border bg-background text-muted"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex gap-2">
         <button
           onClick={testVoice}
@@ -94,7 +117,7 @@ export function VoiceSettingsPanel({ onClose }: { onClose: () => void }) {
           🔈 ทดสอบเสียง
         </button>
         <button
-          onClick={() => update({ voiceURI: null, rate: 0.95, pitch: 1 })}
+          onClick={() => update({ voiceURI: null, rate: 0.95, pitch: 1, particle: "ค่ะ" })}
           className="rounded-lg border border-border px-4 py-2 text-sm text-muted"
         >
           รีเซ็ต
