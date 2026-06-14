@@ -36,20 +36,66 @@ function chime() {
   });
 }
 
-function pickThaiVoice(): SpeechSynthesisVoice | null {
-  const voices = window.speechSynthesis?.getVoices?.() ?? [];
-  return voices.find((v) => v.lang?.toLowerCase().startsWith("th")) ?? null;
+// ---- adjustable voice settings (persisted) ----
+export type VoiceSettings = { voiceURI: string | null; rate: number; pitch: number };
+const SETTINGS_KEY = "keycap_voice";
+const DEFAULT_SETTINGS: VoiceSettings = { voiceURI: null, rate: 0.95, pitch: 1 };
+
+export function getVoiceSettings(): VoiceSettings {
+  if (typeof window === "undefined") return DEFAULT_SETTINGS;
+  try {
+    const r = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+    return {
+      voiceURI: r.voiceURI ?? null,
+      rate: typeof r.rate === "number" ? r.rate : DEFAULT_SETTINGS.rate,
+      pitch: typeof r.pitch === "number" ? r.pitch : DEFAULT_SETTINGS.pitch,
+    };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+export function setVoiceSettings(p: Partial<VoiceSettings>): VoiceSettings {
+  const next = { ...getVoiceSettings(), ...p };
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+  } catch {}
+  return next;
+}
+
+export function listVoices(): SpeechSynthesisVoice[] {
+  if (typeof window === "undefined" || !window.speechSynthesis) return [];
+  return window.speechSynthesis.getVoices();
 }
 
 function speak(text: string) {
   if (typeof window === "undefined" || !window.speechSynthesis) return;
+  const s = getVoiceSettings();
+  const voices = window.speechSynthesis.getVoices();
+  let voice: SpeechSynthesisVoice | null = null;
+  if (s.voiceURI) voice = voices.find((v) => v.voiceURI === s.voiceURI) ?? null;
+  if (!voice) voice = voices.find((v) => v.lang?.toLowerCase().startsWith("th")) ?? null;
+
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = "th-TH";
-  u.rate = 0.95;
-  const th = pickThaiVoice();
-  if (th) u.voice = th;
+  if (voice) {
+    u.voice = voice;
+    u.lang = voice.lang;
+  } else {
+    u.lang = "th-TH";
+  }
+  u.rate = s.rate;
+  u.pitch = s.pitch;
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(u);
+}
+
+/** Speak a sample using the current settings (for the settings panel). */
+export function testVoice() {
+  chime();
+  window.setTimeout(
+    () => speak("ทดสอบเสียงเรียกคิว เชิญคิว เอ หนึ่ง รับสินค้าได้ค่ะ"),
+    380
+  );
 }
 
 // read the queue number digit-by-digit so it's clear (K001 -> "K 0 0 1")
@@ -69,7 +115,6 @@ export function announceQueue(queueNumber: string, name?: string | null) {
 /** Call once on a user gesture to unlock audio + confirm it works. */
 export function primeAudio() {
   getCtx();
-  // warm up voices list and confirm aloud
-  pickThaiVoice();
+  listVoices(); // warm up the voices list
   speak("เปิดเสียงเรียกคิวแล้วค่ะ");
 }

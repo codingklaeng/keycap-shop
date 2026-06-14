@@ -10,6 +10,7 @@ import { formatBaht } from "@/lib/price";
 import { ORDER_STATUS_LABEL, type OrderStatus } from "@/lib/types";
 import { CopyButton } from "@/components/CopyButton";
 import { announceQueue, primeAudio } from "@/lib/announce";
+import { VoiceSettingsPanel } from "@/components/VoiceSettingsPanel";
 
 type BoardLetter = {
   position: number;
@@ -71,6 +72,7 @@ export function AdminBoard({ today }: { today: string }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [soundOn, setSoundOn] = useState(false);
+  const [showVoice, setShowVoice] = useState(false);
   const announced = useRef<Set<string>>(new Set());
   const seeded = useRef(false);
 
@@ -178,8 +180,17 @@ export function AdminBoard({ today }: { today: string }) {
           >
             {soundOn ? "🔊 เสียงเปิด" : "🔇 เสียงปิด"}
           </button>
+          <button
+            onClick={() => setShowVoice((v) => !v)}
+            title="ตั้งค่าเสียง"
+            className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-muted"
+          >
+            ⚙️
+          </button>
         </div>
       </div>
+
+      {showVoice && <VoiceSettingsPanel onClose={() => setShowVoice(false)} />}
 
       {active.length === 0 && (
         <p className="rounded-xl border border-border bg-card p-6 text-center text-muted">
