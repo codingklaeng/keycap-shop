@@ -32,6 +32,7 @@ const DEFAULT: NameplateSpec = {
   ring: "left",
   baseThickness: 3,
   color: "#6d28d9",
+  baseColor: "#e5e7eb",
   edge: "round",
 };
 
@@ -143,7 +144,7 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
           <div className="w-10" />
         </div>
         <div className="relative mx-auto max-w-lg">
-          <NameplateCanvas group={group} sizeMM={size} height={190} />
+          <NameplateCanvas group={group} height={190} />
           {building && (
             <span className="pointer-events-none absolute right-3 top-2 rounded-full bg-background/80 px-2 py-0.5 text-[11px] text-muted">
               กำลังสร้าง…
@@ -229,7 +230,7 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
               </Chip>
             </div>
           </Field>
-          <Field label="สี (พรีวิว)">
+          <Field label="สีตัวอักษร">
             <input
               type="color"
               value={spec.color}
@@ -238,6 +239,15 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
             />
           </Field>
         </div>
+
+        <Field label="สีฐาน">
+          <input
+            type="color"
+            value={spec.baseColor ?? "#e5e7eb"}
+            onChange={(e) => set("baseColor", e.target.value)}
+            className="h-11 w-full rounded-xl border border-border"
+          />
+        </Field>
 
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
           <Field label="ชื่อผู้รับ (สำหรับเรียกรับของ)">

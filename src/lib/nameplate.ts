@@ -16,7 +16,8 @@ export type NameplateSpec = {
   letterSpacing: number; // extra spacing (px in the render canvas)
   ring: RingPos;
   baseThickness: number; // backing plate depth (mm)
-  color: string; // preview color
+  color: string; // text color (preview)
+  baseColor?: string; // base plate + ring color (preview)
   edge: EdgeStyle;
 };
 
@@ -27,6 +28,9 @@ export const NAMEPLATE_FONTS = [
   "Charm",
   "Kanit",
   "Noto Sans Thai",
+  "Sriracha",
+  "Kodchasan",
+  "K2D",
 ];
 
 async function ensureFont(spec: NameplateSpec) {
@@ -132,6 +136,20 @@ export type NameplateResult = {
 export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResult> {
   const shapes = await textToShapes(spec);
   const group = new THREE.Group();
+  const baseCol = spec.baseColor ?? spec.color;
+
+  const textMat = new THREE.MeshStandardMaterial({
+    color: spec.color,
+    roughness: 0.5,
+    metalness: 0.05,
+    side: THREE.DoubleSide,
+  });
+  const baseMat = new THREE.MeshStandardMaterial({
+    color: baseCol,
+    roughness: 0.6,
+    metalness: 0.05,
+    side: THREE.DoubleSide,
+  });
 
   const padMM = Math.max(3, spec.size * 0.35); // plate padding around text
   let textW = spec.size * 2;
@@ -154,19 +172,15 @@ export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResu
       curveSegments: 8,
       steps: 1,
     });
-    geo.scale(k, k, k); // -> mm (height=size, depth=thickness, bevel~0.6mm)
+    // -> mm; negate Y so the text is upright (y-up) and NOT mirrored
+    geo.scale(k, -k, k);
     geo.computeBoundingBox();
     const c = new THREE.Vector3();
     geo.boundingBox!.getCenter(c);
     // center in X/Y, sit the back of the text on z=0 (front toward +z)
     geo.translate(-c.x, -c.y, -geo.boundingBox!.min.z);
-
-    const mat = new THREE.MeshStandardMaterial({
-      color: spec.color,
-      roughness: 0.55,
-      metalness: 0.05,
-    });
-    group.add(new THREE.Mesh(geo, mat));
+    geo.computeVertexNormals();
+    group.add(new THREE.Mesh(geo, textMat));
   }
 
   // base plate (behind the text, z: -baseThickness..0)
@@ -181,14 +195,9 @@ export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResu
     bevelSegments: 2,
   });
   baseGeo.translate(0, 0, -spec.baseThickness);
-  const baseMat = new THREE.MeshStandardMaterial({
-    color: spec.color,
-    roughness: 0.6,
-    metalness: 0.05,
-  });
   group.add(new THREE.Mesh(baseGeo, baseMat));
 
-  // keyring (torus with a hole)
+  // keyring (y-up space: top=+y, left=-x, right=+x)
   if (spec.ring !== "none") {
     const rOuter = Math.min(plateH, plateW) * 0.18 + 1.5;
     const tube = rOuter * 0.32;
@@ -199,16 +208,22 @@ export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResu
     else if (spec.ring === "right") rx = plateW / 2 + rOuter * 0.7;
     else ry = plateH / 2 + rOuter * 0.7; // top
     ringGeo.translate(rx, ry, -spec.baseThickness / 2);
-    group.add(new THREE.Mesh(ringGeo, baseMat.clone()));
+    group.add(new THREE.Mesh(ringGeo, baseMat));
   }
 
-  // SVG space is y-down; flip the whole group upright for viewing/printing
-  group.rotation.x = Math.PI;
+  // center the whole model (including the ring) at the origin
+  group.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(group);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+  group.position.set(-center.x, -center.y, -center.z);
   group.updateMatrixWorld(true);
 
   return {
     group,
-    sizeMM: { w: plateW, h: plateH, d: spec.baseThickness + spec.thickness },
+    sizeMM: { w: size.x, h: size.y, d: size.z },
   };
 }
 
