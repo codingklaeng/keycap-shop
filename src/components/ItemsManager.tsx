@@ -57,7 +57,14 @@ export function ItemsManager(props: {
   keycapStock: KeycapStock[];
   pendants: Pendant[];
   platforms: SocialPlatform[];
-  nameplateConfig: { base_price: number; price_per_char: number; active: boolean };
+  nameplateConfig: {
+    base_price: number;
+    price_per_char: number;
+    price_per_size_mm: number;
+    price_per_mm_thick: number;
+    stroke_surcharge: number;
+    active: boolean;
+  };
 }) {
   const [tab, setTab] = useState<Tab>("types");
   const router = useRouter();
@@ -121,13 +128,23 @@ function NameplateTab({
   config,
   onDone,
 }: {
-  config: { base_price: number; price_per_char: number; active: boolean };
+  config: {
+    base_price: number;
+    price_per_char: number;
+    price_per_size_mm: number;
+    price_per_mm_thick: number;
+    stroke_surcharge: number;
+    active: boolean;
+  };
   onDone: () => void;
 }) {
   async function save(fd: FormData) {
     await saveNameplateConfig({
       base_price: num(fd, "base_price"),
       price_per_char: num(fd, "price_per_char"),
+      price_per_size_mm: num(fd, "price_per_size_mm"),
+      price_per_mm_thick: num(fd, "price_per_mm_thick"),
+      stroke_surcharge: num(fd, "stroke_surcharge"),
       active: fd.get("active") === "on",
     });
     onDone();
@@ -135,18 +152,30 @@ function NameplateTab({
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted">
-        ราคา = ราคาฐาน + (ราคาต่อตัวอักษร × จำนวนตัวอักษร) — ลูกค้าออกแบบเอง
-        แล้วร้านดาวน์โหลดไฟล์ STL ไปปริ้น 3D
+        ราคา = ฐาน + (ต่อตัวอักษร × จำนวนตัว) + (ต่อมม.ขนาด × ขนาด) + (ต่อมม.หนา ×
+        ความหนารวม 3 ชั้น) + ค่าเส้นขอบ(ถ้าเลือก) — ลูกค้าออกแบบเอง แล้วร้านดาวน์โหลด STL ไปปริ้น 3D
       </p>
       <Card>
         <form action={save} className="grid grid-cols-2 gap-3">
           <label className="text-sm">
             ราคาฐาน (บาท)
-            <input name="base_price" type="number" min={0} defaultValue={config.base_price} className={`${inp} w-full`} />
+            <input name="base_price" type="number" min={0} step="0.01" defaultValue={config.base_price} className={`${inp} w-full`} />
           </label>
           <label className="text-sm">
-            ราคาต่อตัวอักษร (บาท)
-            <input name="price_per_char" type="number" min={0} defaultValue={config.price_per_char} className={`${inp} w-full`} />
+            ต่อตัวอักษร (บาท)
+            <input name="price_per_char" type="number" min={0} step="0.01" defaultValue={config.price_per_char} className={`${inp} w-full`} />
+          </label>
+          <label className="text-sm">
+            ต่อมม. ขนาดตัวอักษร
+            <input name="price_per_size_mm" type="number" min={0} step="0.01" defaultValue={config.price_per_size_mm} className={`${inp} w-full`} />
+          </label>
+          <label className="text-sm">
+            ต่อมม. ความหนา (รวม 3 ชั้น)
+            <input name="price_per_mm_thick" type="number" min={0} step="0.01" defaultValue={config.price_per_mm_thick} className={`${inp} w-full`} />
+          </label>
+          <label className="text-sm">
+            ค่าเพิ่มเมื่อมีเส้นขอบ (บาท)
+            <input name="stroke_surcharge" type="number" min={0} step="0.01" defaultValue={config.stroke_surcharge} className={`${inp} w-full`} />
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="active" defaultChecked={config.active} /> เปิดรับสั่งป้ายชื่อ

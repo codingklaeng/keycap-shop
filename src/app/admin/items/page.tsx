@@ -13,6 +13,7 @@ import type {
   Pendant,
   SocialPlatform,
 } from "@/lib/types";
+import type { NameplateConfig as NameplateConfigRow } from "@/lib/catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export default async function ItemsPage() {
       sb.from("keycap_stock").select("*"),
       sb.from("pendants").select("*").order("sort_order"),
       sb.from("social_platforms").select("*").order("sort_order"),
-      sb.from("nameplate_config").select("base_price,price_per_char,active").eq("id", 1).maybeSingle(),
+      sb.from("nameplate_config").select("base_price,price_per_char,price_per_size_mm,price_per_mm_thick,stroke_surcharge,active").eq("id", 1).maybeSingle(),
     ]);
 
   return (
@@ -46,11 +47,14 @@ export default async function ItemsPage() {
         pendants={(pendants.data ?? []) as Pendant[]}
         platforms={(platforms.data ?? []) as SocialPlatform[]}
         nameplateConfig={
-          (npCfg.data as {
-            base_price: number;
-            price_per_char: number;
-            active: boolean;
-          }) ?? { base_price: 80, price_per_char: 25, active: true }
+          (npCfg.data as NameplateConfigRow) ?? {
+            base_price: 80,
+            price_per_char: 25,
+            price_per_size_mm: 1.5,
+            price_per_mm_thick: 5,
+            stroke_surcharge: 30,
+            active: true,
+          }
         }
       />
     </div>

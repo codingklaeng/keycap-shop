@@ -148,6 +148,9 @@ export async function saveSocialPlatform(input: SocialPlatformInput) {
 export async function saveNameplateConfig(input: {
   base_price: number;
   price_per_char: number;
+  price_per_size_mm: number;
+  price_per_mm_thick: number;
+  stroke_surcharge: number;
   active: boolean;
 }) {
   const sb = await guard();

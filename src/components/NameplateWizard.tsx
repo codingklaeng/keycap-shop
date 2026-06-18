@@ -26,6 +26,7 @@ const DEFAULT: NameplateSpec = {
   text: "ชื่อคุณ",
   font: "Sarabun",
   weight: 700,
+  style: "normal",
   size: 18,
   thickness: 4,
   letterSpacing: 0,
@@ -34,6 +35,10 @@ const DEFAULT: NameplateSpec = {
   color: "#6d28d9",
   baseColor: "#e5e7eb",
   edge: "round",
+  stroke: false,
+  strokeColor: "#111827",
+  strokeWidth: 1.2,
+  strokeHeight: 2,
 };
 
 function disposeGroup(g: THREE.Object3D | null) {
@@ -65,8 +70,15 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
     () => splitGraphemes(spec.text.trim()).length,
     [spec.text]
   );
+  const hasStroke = !!spec.stroke && (spec.strokeWidth ?? 0) > 0;
+  const totalThick =
+    spec.baseThickness + (hasStroke ? spec.strokeHeight ?? 2 : 0) + spec.thickness;
   const price =
-    Number(config.base_price) + Number(config.price_per_char) * charCount;
+    Number(config.base_price) +
+    Number(config.price_per_char) * charCount +
+    Number(config.price_per_size_mm) * spec.size +
+    Number(config.price_per_mm_thick) * totalThick +
+    (hasStroke ? Number(config.stroke_surcharge) : 0);
 
   function set<K extends keyof NameplateSpec>(k: K, v: NameplateSpec[K]) {
     setSpec((s) => ({ ...s, [k]: v }));
@@ -187,11 +199,25 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
               onChange={(e) => set("weight", Number(e.target.value))}
               className={inp}
             >
+              <option value={300}>บาง</option>
               <option value={400}>ปกติ</option>
+              <option value={500}>กลาง</option>
+              <option value={600}>กึ่งหนา</option>
               <option value={700}>หนา</option>
             </select>
           </Field>
         </div>
+
+        <Field label="รูปแบบ">
+          <div className="flex gap-2">
+            <Chip active={(spec.style ?? "normal") === "normal"} onClick={() => set("style", "normal")}>
+              ตั้งตรง
+            </Chip>
+            <Chip active={spec.style === "italic"} onClick={() => set("style", "italic")}>
+              เอียง (italic)
+            </Chip>
+          </div>
+        </Field>
 
         <Slider label="ขนาดตัวอักษร" unit="มม." min={10} max={40} step={1}
           value={spec.size} onChange={(v) => set("size", v)} />
@@ -220,13 +246,16 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="ลักษณะขอบ">
-            <div className="flex gap-2">
+          <Field label="ลักษณะขอบฐาน">
+            <div className="flex flex-wrap gap-2">
               <Chip active={spec.edge === "sharp"} onClick={() => set("edge", "sharp")}>
                 คม
               </Chip>
               <Chip active={spec.edge === "round"} onClick={() => set("edge", "round")}>
                 มน
+              </Chip>
+              <Chip active={spec.edge === "contour"} onClick={() => set("edge", "contour")}>
+                ตามตัวอักษร
               </Chip>
             </div>
           </Field>
@@ -248,6 +277,34 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
             className="h-11 w-full rounded-xl border border-border"
           />
         </Field>
+
+        {/* middle stroke layer */}
+        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+          <label className="flex items-center gap-2 font-medium">
+            <input
+              type="checkbox"
+              checked={!!spec.stroke}
+              onChange={(e) => set("stroke", e.target.checked)}
+            />
+            เพิ่มเส้นขอบรอบตัวอักษร (ชั้นกลาง)
+          </label>
+          {spec.stroke && (
+            <>
+              <Field label="สีเส้นขอบ">
+                <input
+                  type="color"
+                  value={spec.strokeColor ?? "#111827"}
+                  onChange={(e) => set("strokeColor", e.target.value)}
+                  className="h-11 w-full rounded-xl border border-border"
+                />
+              </Field>
+              <Slider label="ความกว้างเส้นขอบ" unit="มม." min={0.4} max={5} step={0.2}
+                value={spec.strokeWidth ?? 1.2} onChange={(v) => set("strokeWidth", v)} />
+              <Slider label="ความหนาเส้นขอบ" unit="มม." min={1} max={6} step={0.5}
+                value={spec.strokeHeight ?? 2} onChange={(v) => set("strokeHeight", v)} />
+            </>
+          )}
+        </div>
 
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
           <Field label="ชื่อผู้รับ (สำหรับเรียกรับของ)">

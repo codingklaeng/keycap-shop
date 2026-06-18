@@ -27,7 +27,7 @@ export default function RootLayout({
         />
         {/* fonts usable by the nameplate canvas */}
         <link
-          href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&family=Mitr:wght@400;700&family=Prompt:wght@400;700&family=Charm:wght@400;700&family=Kanit:wght@400;700&family=Noto+Sans+Thai:wght@400;700&family=Sriracha&family=Kodchasan:wght@400;700&family=K2D:wght@400;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Mitr:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600;700&family=Charm:wght@400;700&family=Kanit:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Sriracha&family=Kodchasan:wght@300;400;500;600;700&family=K2D:wght@300;400;500;600;700&family=Itim&family=KoHo:wght@300;400;500;600;700&display=swap"
           rel="stylesheet"
         />
       </head>
