@@ -51,7 +51,8 @@ const BOARD_SELECT =
   "customer_name,customer_contact," +
   "base_sizes(max_chars,base_types(name)),base_colors(name,swatch),pendants(name)," +
   "order_letters(position,char,keycap_colors(name,key_color,text_color))," +
-  "order_nfc(social_value,social_url,social_platforms(name,icon,image_url))";
+  "order_nfc(social_value,social_url,social_platforms(name,icon,image_url))," +
+  "order_nameplate(text,spec)";
 
 // Read the board: today's orders + any older order still waiting to be picked
 // up ('ready' from a previous day) so the shop can chase no-shows.

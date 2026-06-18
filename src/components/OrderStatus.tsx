@@ -129,7 +129,16 @@ export function OrderStatus({ id }: { id: string }) {
 
       {/* details */}
       <div className="mt-6 rounded-2xl border border-border bg-card p-4">
-        {order.product_type === "nfc" ? (
+        {order.product_type === "nameplate" ? (
+          <dl className="space-y-1 text-sm">
+            <Row label="สินค้า" value="ป้ายชื่อ 3D" />
+            <Row label="ข้อความ" value={order.nameplate?.text ?? order.text} />
+            {order.customer_name && (
+              <Row label="ชื่อผู้รับ" value={order.customer_name} />
+            )}
+            {order.note && <Row label="หมายเหตุ" value={order.note} />}
+          </dl>
+        ) : order.product_type === "nfc" ? (
           <dl className="space-y-1 text-sm">
             <Row label="สินค้า" value="พวงกุญแจ NFC" />
             {order.customer_name && (

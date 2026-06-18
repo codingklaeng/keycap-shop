@@ -30,6 +30,13 @@ export default function Home() {
             <div className="text-lg font-semibold">📱 พวงกุญแจ NFC</div>
             <div className="text-sm text-muted">แตะแชร์ช่อง social ของคุณ</div>
           </Link>
+          <Link
+            href="/order/nameplate"
+            className="block rounded-xl border border-border bg-card px-6 py-4 text-left text-foreground shadow-sm transition hover:border-primary"
+          >
+            <div className="text-lg font-semibold">🔤 ป้ายชื่อ 3D</div>
+            <div className="text-sm text-muted">ออกแบบเอง ปรับฟอนต์/ขนาด/ห่วง</div>
+          </Link>
         </div>
 
         <TrackOrderButton />

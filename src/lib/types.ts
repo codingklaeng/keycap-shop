@@ -115,7 +115,7 @@ export type OrderDetail = {
   total_price: number;
   note: string | null;
   created_at: string;
-  product_type: "keycap" | "nfc";
+  product_type: "keycap" | "nfc" | "nameplate";
   layout: "horizontal" | "vertical" | null;
   customer_name: string | null;
   nfc: {
@@ -125,6 +125,7 @@ export type OrderDetail = {
     value: string;
     url: string;
   } | null;
+  nameplate: { text: string; spec: Record<string, unknown> } | null;
   base_size: { label: string } | null;
   base_color: { name: string; swatch: string | null } | null;
   pendant: { name: string } | null;

@@ -11,6 +11,7 @@ import {
   saveKeycapColor,
   savePendant,
   saveSocialPlatform,
+  saveNameplateConfig,
   deleteItem,
   setKeycapStock,
   addKeycapChars,
@@ -34,7 +35,8 @@ type Tab =
   | "variants"
   | "keycaps"
   | "pendants"
-  | "nfc";
+  | "nfc"
+  | "nameplate";
 const TABS: { key: Tab; label: string }[] = [
   { key: "types", label: "แบบฐาน" },
   { key: "sizes", label: "ขนาดฐาน" },
@@ -43,6 +45,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "keycaps", label: "สีตัวอักษร + สต็อก" },
   { key: "pendants", label: "ตัวห้อย" },
   { key: "nfc", label: "NFC (social)" },
+  { key: "nameplate", label: "ป้ายชื่อ 3D" },
 ];
 
 export function ItemsManager(props: {
@@ -54,6 +57,7 @@ export function ItemsManager(props: {
   keycapStock: KeycapStock[];
   pendants: Pendant[];
   platforms: SocialPlatform[];
+  nameplateConfig: { base_price: number; price_per_char: number; active: boolean };
 }) {
   const [tab, setTab] = useState<Tab>("types");
   const router = useRouter();
@@ -106,6 +110,52 @@ export function ItemsManager(props: {
       {tab === "nfc" && (
         <PlatformsTab platforms={props.platforms} onDone={refresh} />
       )}
+      {tab === "nameplate" && (
+        <NameplateTab config={props.nameplateConfig} onDone={refresh} />
+      )}
+    </div>
+  );
+}
+
+function NameplateTab({
+  config,
+  onDone,
+}: {
+  config: { base_price: number; price_per_char: number; active: boolean };
+  onDone: () => void;
+}) {
+  async function save(fd: FormData) {
+    await saveNameplateConfig({
+      base_price: num(fd, "base_price"),
+      price_per_char: num(fd, "price_per_char"),
+      active: fd.get("active") === "on",
+    });
+    onDone();
+  }
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted">
+        ราคา = ราคาฐาน + (ราคาต่อตัวอักษร × จำนวนตัวอักษร) — ลูกค้าออกแบบเอง
+        แล้วร้านดาวน์โหลดไฟล์ STL ไปปริ้น 3D
+      </p>
+      <Card>
+        <form action={save} className="grid grid-cols-2 gap-3">
+          <label className="text-sm">
+            ราคาฐาน (บาท)
+            <input name="base_price" type="number" min={0} defaultValue={config.base_price} className={`${inp} w-full`} />
+          </label>
+          <label className="text-sm">
+            ราคาต่อตัวอักษร (บาท)
+            <input name="price_per_char" type="number" min={0} defaultValue={config.price_per_char} className={`${inp} w-full`} />
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="active" defaultChecked={config.active} /> เปิดรับสั่งป้ายชื่อ
+          </label>
+          <div>
+            <button className={btnAdd}>บันทึก</button>
+          </div>
+        </form>
+      </Card>
     </div>
   );
 }

@@ -20,7 +20,7 @@ export default async function ItemsPage() {
   if (!(await isAdmin())) redirect("/admin/login");
 
   const sb = createAdminClient();
-  const [types, sizes, baseColors, variants, keycapColors, stock, pendants, platforms] =
+  const [types, sizes, baseColors, variants, keycapColors, stock, pendants, platforms, npCfg] =
     await Promise.all([
       sb.from("base_types").select("*").order("sort_order"),
       sb.from("base_sizes").select("*").order("sort_order"),
@@ -30,6 +30,7 @@ export default async function ItemsPage() {
       sb.from("keycap_stock").select("*"),
       sb.from("pendants").select("*").order("sort_order"),
       sb.from("social_platforms").select("*").order("sort_order"),
+      sb.from("nameplate_config").select("base_price,price_per_char,active").eq("id", 1).maybeSingle(),
     ]);
 
   return (
@@ -44,6 +45,13 @@ export default async function ItemsPage() {
         keycapStock={(stock.data ?? []) as KeycapStock[]}
         pendants={(pendants.data ?? []) as Pendant[]}
         platforms={(platforms.data ?? []) as SocialPlatform[]}
+        nameplateConfig={
+          (npCfg.data as {
+            base_price: number;
+            price_per_char: number;
+            active: boolean;
+          }) ?? { base_price: 80, price_per_char: 25, active: true }
+        }
       />
     </div>
   );

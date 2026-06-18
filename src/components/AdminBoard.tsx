@@ -11,6 +11,8 @@ import { ORDER_STATUS_LABEL, type OrderStatus } from "@/lib/types";
 import { CopyButton } from "@/components/CopyButton";
 import { announceQueue, primeAudio } from "@/lib/announce";
 import { VoiceSettingsPanel } from "@/components/VoiceSettingsPanel";
+import { DownloadStlButton } from "@/components/DownloadStlButton";
+import type { NameplateSpec } from "@/lib/nameplate";
 
 type BoardLetter = {
   position: number;
@@ -33,7 +35,7 @@ type BoardOrder = {
   total_price: number;
   note: string | null;
   created_at: string;
-  product_type: "keycap" | "nfc";
+  product_type: "keycap" | "nfc" | "nameplate";
   layout: "horizontal" | "vertical" | null;
   customer_name: string | null;
   customer_contact: string | null;
@@ -42,7 +44,20 @@ type BoardOrder = {
   pendants: { name: string } | null;
   order_letters: BoardLetter[];
   order_nfc: BoardNfc | BoardNfc[] | null;
+  order_nameplate: BoardNameplate | BoardNameplate[] | null;
 };
+
+type BoardNameplate = { text: string; spec: NameplateSpec };
+
+function nameplateOf(o: BoardOrder): BoardNameplate | null {
+  const n = o.order_nameplate;
+  if (!n) return null;
+  return Array.isArray(n) ? n[0] ?? null : n;
+}
+
+function ringLabel(r?: string) {
+  return r === "left" ? "ซ้าย" : r === "right" ? "ขวา" : r === "top" ? "บน" : "ไม่มี";
+}
 
 function baseLabel(o: BoardOrder): string {
   const s = o.base_sizes;
@@ -255,7 +270,9 @@ function OrderCard({
     (a, b) => a.position - b.position
   );
   const isNfc = order.product_type === "nfc";
+  const isNameplate = order.product_type === "nameplate";
   const nfc = nfcOf(order);
+  const np = nameplateOf(order);
   const isOld = order.queue_date !== today;
 
   return (
@@ -276,7 +293,7 @@ function OrderCard({
         </div>
         <div className="flex flex-col items-end gap-1">
           <span className="rounded-full bg-background px-3 py-1 text-xs font-medium">
-            {isNfc ? "📱 NFC · " : ""}
+            {isNfc ? "📱 NFC · " : isNameplate ? "🔤 ป้ายชื่อ · " : ""}
             {ORDER_STATUS_LABEL[order.status]}
           </span>
           {isOld && (
@@ -302,7 +319,26 @@ function OrderCard({
         )}
       </div>
 
-      {isNfc ? (
+      {isNameplate ? (
+        /* Nameplate: show text + download the STL to 3D-print */
+        <div className="mt-3 space-y-2">
+          <div className="text-lg font-bold" style={{ fontFamily: np?.spec.font }}>
+            {np?.text ?? order.text}
+          </div>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+            <Info label="ฟอนต์" value={String(np?.spec.font ?? "-")} />
+            <Info label="ขนาด" value={`${np?.spec.size ?? "-"} มม.`} />
+            <Info label="ห่วง" value={ringLabel(np?.spec.ring)} />
+            <Info label="ราคา" value={formatBaht(Number(order.total_price))} />
+          </dl>
+          {np && (
+            <DownloadStlButton
+              spec={np.spec}
+              filename={`${order.queue_number}-${np.text}.stl`}
+            />
+          )}
+        </div>
+      ) : isNfc ? (
         /* NFC: show platform + handle + generated url to write to the tag */
         <div className="mt-3 space-y-2">
           <div className="flex items-center gap-2 font-medium">

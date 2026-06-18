@@ -12,6 +12,8 @@
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
     "@supabase/supabase-js": "^2.108.1",
+    "d3-contour": "^4.0.2",
+    "esm-potrace-wasm": "^0.4.4",
     "next": "16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -19,6 +21,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/d3-contour": "^3.0.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

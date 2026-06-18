@@ -145,6 +145,19 @@ export async function saveSocialPlatform(input: SocialPlatformInput) {
   if (error) throw new Error(error.message);
 }
 
+export async function saveNameplateConfig(input: {
+  base_price: number;
+  price_per_char: number;
+  active: boolean;
+}) {
+  const sb = await guard();
+  const { error } = await sb
+    .from("nameplate_config")
+    .update(input)
+    .eq("id", 1);
+  if (error) throw new Error(error.message);
+}
+
 export async function deleteItem(
   table:
     | "base_types"
