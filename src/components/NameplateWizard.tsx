@@ -31,6 +31,8 @@ const DEFAULT: NameplateSpec = {
   thickness: 4,
   letterSpacing: 0,
   ring: "left",
+  ringDiameter: 12,
+  ringThickness: 3.5,
   baseThickness: 3,
   color: "#6d28d9",
   baseColor: "#e5e7eb",
@@ -156,7 +158,7 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
           <div className="w-10" />
         </div>
         <div className="relative mx-auto max-w-lg">
-          <NameplateCanvas group={group} height={190} />
+          <NameplateCanvas group={group} size={size} height={190} />
           {building && (
             <span className="pointer-events-none absolute right-3 top-2 rounded-full bg-background/80 px-2 py-0.5 text-[11px] text-muted">
               กำลังสร้าง…
@@ -244,6 +246,15 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
             ))}
           </div>
         </Field>
+
+        {spec.ring !== "none" && (
+          <div className="grid grid-cols-2 gap-3">
+            <Slider label="เส้นผ่านศูนย์กลางห่วง" unit="มม." min={6} max={20} step={0.5}
+              value={spec.ringDiameter ?? 12} onChange={(v) => set("ringDiameter", v)} />
+            <Slider label="ความหนาห่วง" unit="มม." min={1} max={5} step={0.5}
+              value={spec.ringThickness ?? 3.5} onChange={(v) => set("ringThickness", v)} />
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <Field label="ลักษณะขอบฐาน">

@@ -17,6 +17,8 @@ export type NameplateSpec = {
   thickness: number; // text depth (mm)
   letterSpacing: number; // extra spacing (px in the render canvas)
   ring: RingPos;
+  ringDiameter?: number; // outer Ø of the keyring loop (mm)
+  ringThickness?: number; // bar/tube thickness of the loop (mm)
   baseThickness: number; // backing plate depth (mm)
   color: string; // text color (preview)
   baseColor?: string; // base plate + ring color (preview)
@@ -257,15 +259,27 @@ export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResu
     const pbox = new THREE.Box3().setFromObject(group);
     const pw = pbox.max.x - pbox.min.x;
     const ph = pbox.max.y - pbox.min.y;
-    const rOuter = Math.min(pw, ph) * 0.13 + 2;
-    const tube = rOuter * 0.32;
-    const ringGeo = new THREE.TorusGeometry(rOuter, tube, 12, 28);
+    // ring sizing: explicit (mm) from the user, or auto-scaled to the plate
+    const outerD =
+      spec.ringDiameter && spec.ringDiameter > 0
+        ? spec.ringDiameter
+        : Math.min(pw, ph) * 0.26 + 4;
+    const barT =
+      spec.ringThickness && spec.ringThickness > 0
+        ? spec.ringThickness
+        : outerD * 0.32;
+    const tube = Math.max(0.4, barT / 2); // torus tube radius
+    const rMean = Math.max(tube + 0.3, outerD / 2 - tube); // torus mean radius
+    const rOuter = rMean + tube;
+    const ringGeo = new THREE.TorusGeometry(rMean, tube, 18, 48);
     let rx = 0,
       ry = 0;
     if (spec.ring === "left") rx = pbox.min.x - rOuter * 0.7;
     else if (spec.ring === "right") rx = pbox.max.x + rOuter * 0.7;
     else ry = pbox.max.y + rOuter * 0.7; // top
-    ringGeo.translate(rx, ry, baseT / 2);
+    // the lowest point of the ring sits flush with the base bottom (z = 0) so
+    // it doesn't dip below the plate when the piece is printed lying flat.
+    ringGeo.translate(rx, ry, tube);
     group.add(new THREE.Mesh(ringGeo, baseMat));
   }
 
