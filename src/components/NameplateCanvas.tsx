@@ -25,33 +25,31 @@ function Ruler({ w, h }: { w: number; h: number }) {
     const tMaj = 3;
     const tMin = 1.5;
 
-    // horizontal ruler (bottom)
-    const xMax = Math.max(major, Math.ceil(w / 2 / major) * major);
+    // horizontal ruler (bottom): 0 at the left edge, increasing to the right
+    const xLeft = -w / 2;
     const yBar = -h / 2 - gap;
-    pts.push(-xMax, yBar, 0, xMax, yBar, 0);
-    for (let x = 0; x <= xMax + 0.001; x += minor) {
-      const maj = Math.round(x) % major === 0;
+    pts.push(xLeft, yBar, 0, xLeft + w, yBar, 0);
+    for (let d = 0; d <= w + 0.001; d += minor) {
+      const maj = Math.round(d) % major === 0;
       const t = maj ? tMaj : tMin;
-      for (const sx of x === 0 ? [0] : [x, -x]) {
-        pts.push(sx, yBar, 0, sx, yBar - t, 0);
-        if (maj && x > 0)
-          labels.push({ pos: [sx, yBar - t - 2.6, 0], text: String(Math.round(x / 10)) });
-      }
+      const x = xLeft + d;
+      pts.push(x, yBar, 0, x, yBar - t, 0);
+      if (maj)
+        labels.push({ pos: [x, yBar - t - 2.6, 0], text: String(Math.round(d / 10)) });
     }
-    labels.push({ pos: [xMax + 5.5, yBar, 0], text: "cm" });
+    labels.push({ pos: [xLeft + w + 5.5, yBar, 0], text: "cm" });
 
-    // vertical ruler (left)
-    const yMax = Math.max(major, Math.ceil(h / 2 / major) * major);
+    // vertical ruler (left): 0 at the bottom edge, increasing upward
+    const yBot = -h / 2;
     const xBar = -w / 2 - gap;
-    pts.push(xBar, -yMax, 0, xBar, yMax, 0);
-    for (let y = 0; y <= yMax + 0.001; y += minor) {
-      const maj = Math.round(y) % major === 0;
+    pts.push(xBar, yBot, 0, xBar, yBot + h, 0);
+    for (let d = 0; d <= h + 0.001; d += minor) {
+      const maj = Math.round(d) % major === 0;
       const t = maj ? tMaj : tMin;
-      for (const sy of y === 0 ? [0] : [y, -y]) {
-        pts.push(xBar, sy, 0, xBar - t, sy, 0);
-        if (maj && y > 0)
-          labels.push({ pos: [xBar - t - 3.4, sy, 0], text: String(Math.round(y / 10)) });
-      }
+      const y = yBot + d;
+      pts.push(xBar, y, 0, xBar - t, y, 0);
+      if (maj)
+        labels.push({ pos: [xBar - t - 3.4, y, 0], text: String(Math.round(d / 10)) });
     }
 
     const g = new THREE.BufferGeometry();
