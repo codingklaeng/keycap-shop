@@ -63,6 +63,7 @@ export function ItemsManager(props: {
     price_per_size_mm: number;
     price_per_mm_thick: number;
     stroke_surcharge: number;
+    icon_surcharge: number;
     active: boolean;
   };
 }) {
@@ -134,6 +135,7 @@ function NameplateTab({
     price_per_size_mm: number;
     price_per_mm_thick: number;
     stroke_surcharge: number;
+    icon_surcharge: number;
     active: boolean;
   };
   onDone: () => void;
@@ -145,6 +147,7 @@ function NameplateTab({
       price_per_size_mm: num(fd, "price_per_size_mm"),
       price_per_mm_thick: num(fd, "price_per_mm_thick"),
       stroke_surcharge: num(fd, "stroke_surcharge"),
+      icon_surcharge: num(fd, "icon_surcharge"),
       active: fd.get("active") === "on",
     });
     onDone();
@@ -176,6 +179,10 @@ function NameplateTab({
           <label className="text-sm">
             ค่าเพิ่มเมื่อมีเส้นขอบ (บาท)
             <input name="stroke_surcharge" type="number" min={0} step="0.01" defaultValue={config.stroke_surcharge} className={`${inp} w-full`} />
+          </label>
+          <label className="text-sm">
+            ค่าเพิ่มเมื่อมีไอคอน (บาท)
+            <input name="icon_surcharge" type="number" min={0} step="0.01" defaultValue={config.icon_surcharge} className={`${inp} w-full`} />
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="active" defaultChecked={config.active} /> เปิดรับสั่งป้ายชื่อ

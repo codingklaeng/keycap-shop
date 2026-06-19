@@ -17,6 +17,7 @@ export type NameplateConfig = {
   price_per_size_mm: number;
   price_per_mm_thick: number;
   stroke_surcharge: number;
+  icon_surcharge: number;
   active: boolean;
 };
 
@@ -25,7 +26,7 @@ export async function getNameplateConfig(): Promise<NameplateConfig | null> {
   const { data } = await sb
     .from("nameplate_config")
     .select(
-      "base_price,price_per_char,price_per_size_mm,price_per_mm_thick,stroke_surcharge,active"
+      "base_price,price_per_char,price_per_size_mm,price_per_mm_thick,stroke_surcharge,icon_surcharge,active"
     )
     .eq("id", 1)
     .maybeSingle();

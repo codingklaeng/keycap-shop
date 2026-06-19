@@ -12,6 +12,7 @@ import { saveLastOrder } from "@/components/TrackOrderButton";
 import {
   buildNameplate,
   NAMEPLATE_FONTS,
+  NAMEPLATE_ICONS,
   type NameplateSpec,
   type RingPos,
 } from "@/lib/nameplate";
@@ -33,6 +34,11 @@ const DEFAULT: NameplateSpec = {
   ring: "left",
   ringDiameter: 12,
   ringThickness: 3.5,
+  icon: "none",
+  iconPos: "left",
+  iconScale: 1.2,
+  iconColor: "#ef4444",
+  iconAccentColor: "#fde047",
   baseThickness: 3,
   color: "#6d28d9",
   baseColor: "#e5e7eb",
@@ -73,6 +79,9 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
     [spec.text]
   );
   const hasStroke = !!spec.stroke && (spec.strokeWidth ?? 0) > 0;
+  const hasIcon = !!spec.icon && spec.icon !== "none";
+  const iconHasAccent =
+    hasIcon && !!NAMEPLATE_ICONS.find((i) => i.name === spec.icon)?.accent;
   const totalThick =
     spec.baseThickness + (hasStroke ? spec.strokeHeight ?? 2 : 0) + spec.thickness;
   const price =
@@ -80,7 +89,8 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
     Number(config.price_per_char) * charCount +
     Number(config.price_per_size_mm) * spec.size +
     Number(config.price_per_mm_thick) * totalThick +
-    (hasStroke ? Number(config.stroke_surcharge) : 0);
+    (hasStroke ? Number(config.stroke_surcharge) : 0) +
+    (hasIcon ? Number(config.icon_surcharge) : 0);
 
   function set<K extends keyof NameplateSpec>(k: K, v: NameplateSpec[K]) {
     setSpec((s) => ({ ...s, [k]: v }));
@@ -313,6 +323,58 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
                 value={spec.strokeWidth ?? 1.2} onChange={(v) => set("strokeWidth", v)} />
               <Slider label="ความหนาเส้นขอบ" unit="มม." min={1} max={6} step={0.5}
                 value={spec.strokeHeight ?? 2} onChange={(v) => set("strokeHeight", v)} />
+            </>
+          )}
+        </div>
+
+        {/* decorative icon */}
+        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+          <Field label="ไอคอนตกแต่ง">
+            <div className="flex flex-wrap gap-2">
+              <Chip active={(spec.icon ?? "none") === "none"} onClick={() => set("icon", "none")}>
+                ไม่มี
+              </Chip>
+              {NAMEPLATE_ICONS.map((ic) => (
+                <Chip key={ic.name} active={spec.icon === ic.name} onClick={() => set("icon", ic.name)}>
+                  {ic.label}
+                </Chip>
+              ))}
+            </div>
+          </Field>
+          {hasIcon && (
+            <>
+              <Field label="ตำแหน่งไอคอน">
+                <div className="flex gap-2">
+                  <Chip active={(spec.iconPos ?? "left") === "left"} onClick={() => set("iconPos", "left")}>
+                    ซ้ายของชื่อ
+                  </Chip>
+                  <Chip active={spec.iconPos === "right"} onClick={() => set("iconPos", "right")}>
+                    ขวาของชื่อ
+                  </Chip>
+                </div>
+              </Field>
+              <Slider label="ขนาดไอคอน (เท่าของตัวอักษร)" unit="x" min={0.7} max={2} step={0.1}
+                value={spec.iconScale ?? 1.2} onChange={(v) => set("iconScale", v)} />
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="สีไอคอน">
+                  <input
+                    type="color"
+                    value={spec.iconColor ?? "#ef4444"}
+                    onChange={(e) => set("iconColor", e.target.value)}
+                    className="h-11 w-full rounded-xl border border-border"
+                  />
+                </Field>
+                {iconHasAccent && (
+                  <Field label="สีลายในไอคอน">
+                    <input
+                      type="color"
+                      value={spec.iconAccentColor ?? "#fde047"}
+                      onChange={(e) => set("iconAccentColor", e.target.value)}
+                      className="h-11 w-full rounded-xl border border-border"
+                    />
+                  </Field>
+                )}
+              </div>
             </>
           )}
         </div>

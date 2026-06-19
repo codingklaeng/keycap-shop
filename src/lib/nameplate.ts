@@ -28,7 +28,24 @@ export type NameplateSpec = {
   strokeColor?: string;
   strokeWidth?: number; // how far the outline extends outward (mm)
   strokeHeight?: number; // outline layer depth (mm)
+  // optional decorative icon next to the text (heart, star, flower, …)
+  icon?: IconName; // "none" or unset = no icon
+  iconPos?: "left" | "right"; // which side of the text
+  iconScale?: number; // icon height relative to the text height
+  iconColor?: string; // main icon color
+  iconAccentColor?: string; // 2nd-tone color (flower center, star inner, …)
 };
+
+export type IconName =
+  | "none"
+  | "heart"
+  | "star"
+  | "flower"
+  | "crown"
+  | "butterfly"
+  | "cloud"
+  | "pawDog"
+  | "pawCat";
 
 export const NAMEPLATE_FONTS = [
   "Sarabun",
@@ -43,6 +60,179 @@ export const NAMEPLATE_FONTS = [
   "Itim",
   "KoHo",
 ];
+
+// Icons available for the nameplate. `accent` = has a 2nd-tone detail part.
+export const NAMEPLATE_ICONS: { name: IconName; label: string; accent: boolean }[] = [
+  { name: "heart", label: "หัวใจ", accent: true },
+  { name: "star", label: "ดาว", accent: true },
+  { name: "flower", label: "ดอกไม้", accent: true },
+  { name: "crown", label: "มงกุฎ", accent: true },
+  { name: "butterfly", label: "ผีเสื้อ", accent: true },
+  { name: "cloud", label: "เมฆ", accent: false },
+  { name: "pawDog", label: "อุ้งเท้าหมา", accent: false },
+  { name: "pawCat", label: "อุ้งเท้าแมว", accent: false },
+];
+
+type IconPart = "main" | "accent" | "all";
+
+// Each icon paints filled black inside a 100×100 box (the caller has already
+// translated/scaled the context and set a black fill). Every primitive is its
+// own fill so overlapping pieces union cleanly on the bitmap before tracing.
+const ICON_DRAW: Record<
+  Exclude<IconName, "none">,
+  (ctx: CanvasRenderingContext2D, part: IconPart) => void
+> = {
+  heart(ctx, part) {
+    if (part !== "accent") {
+      ctx.beginPath();
+      ctx.moveTo(50, 86);
+      ctx.bezierCurveTo(18, 62, 6, 42, 6, 26);
+      ctx.bezierCurveTo(6, 12, 22, 6, 36, 14);
+      ctx.bezierCurveTo(43, 18, 48, 24, 50, 30);
+      ctx.bezierCurveTo(52, 24, 57, 18, 64, 14);
+      ctx.bezierCurveTo(78, 6, 94, 12, 94, 26);
+      ctx.bezierCurveTo(94, 42, 82, 62, 50, 86);
+      ctx.closePath();
+      ctx.fill();
+    }
+    if (part !== "main") {
+      ctx.beginPath();
+      ctx.ellipse(34, 31, 7, 10, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+  star(ctx, part) {
+    const draw = (outer: number, inner: number) => {
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const r = i % 2 ? inner : outer;
+        const a = -Math.PI / 2 + (i * Math.PI) / 5;
+        const x = 50 + Math.cos(a) * r;
+        const y = 52 + Math.sin(a) * r;
+        if (i) ctx.lineTo(x, y);
+        else ctx.moveTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+    };
+    if (part !== "accent") draw(46, 19);
+    if (part !== "main") draw(22, 9);
+  },
+  flower(ctx, part) {
+    if (part !== "accent") {
+      for (let i = 0; i < 6; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI) / 3;
+        const x = 50 + Math.cos(a) * 24;
+        const y = 48 + Math.sin(a) * 24;
+        ctx.beginPath();
+        ctx.arc(x, y, 17, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    if (part !== "main") {
+      ctx.beginPath();
+      ctx.arc(50, 48, 14, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+  crown(ctx, part) {
+    if (part !== "accent") {
+      ctx.beginPath();
+      ctx.moveTo(12, 72);
+      ctx.lineTo(12, 38);
+      ctx.lineTo(31, 55);
+      ctx.lineTo(50, 28);
+      ctx.lineTo(69, 55);
+      ctx.lineTo(88, 38);
+      ctx.lineTo(88, 72);
+      ctx.closePath();
+      ctx.fill();
+    }
+    if (part !== "main") {
+      for (const [x, y, r] of [
+        [50, 33, 6],
+        [14, 41, 5],
+        [86, 41, 5],
+      ] as const) {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.rect(12, 64, 76, 8);
+      ctx.fill();
+    }
+  },
+  butterfly(ctx, part) {
+    if (part !== "accent") {
+      for (const [x, y, rx, ry, rot] of [
+        [32, 36, 21, 23, -0.4],
+        [68, 36, 21, 23, 0.4],
+        [35, 66, 15, 16, 0.5],
+        [65, 66, 15, 16, -0.5],
+      ] as const) {
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    if (part !== "main") {
+      ctx.beginPath();
+      ctx.ellipse(50, 52, 5, 27, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(50, 22, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+  cloud(ctx, part) {
+    if (part === "accent") return;
+    for (const [x, y, r] of [
+      [33, 57, 18],
+      [50, 44, 23],
+      [69, 57, 18],
+    ] as const) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.rect(33, 57, 36, 18);
+    ctx.fill();
+  },
+  pawDog(ctx, part) {
+    if (part === "accent") return;
+    ctx.beginPath();
+    ctx.ellipse(50, 66, 23, 19, 0, 0, Math.PI * 2);
+    ctx.fill();
+    for (const [x, y, r] of [
+      [24, 38, 9],
+      [42, 26, 10],
+      [58, 26, 10],
+      [76, 38, 9],
+    ] as const) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+  pawCat(ctx, part) {
+    if (part === "accent") return;
+    ctx.beginPath();
+    ctx.ellipse(50, 64, 21, 17, 0, 0, Math.PI * 2);
+    ctx.fill();
+    for (const [x, y, r] of [
+      [27, 43, 8],
+      [43, 32, 8.5],
+      [57, 32, 8.5],
+      [73, 43, 8],
+    ] as const) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+};
 
 function fontString(spec: NameplateSpec, fontPx: number): string {
   const style = spec.style === "italic" ? "italic " : "";
@@ -92,23 +282,27 @@ function traceCanvas(ctx: CanvasRenderingContext2D, W: number, H: number): THREE
   return shapes;
 }
 
-// Render the text (optionally with an outward stroke of `expandPx`) on a fixed
-// canvas/origin so every layer shares the same coordinate frame, then trace it.
-function traceLayer(
-  spec: NameplateSpec,
-  fontPx: number,
-  W: number,
-  H: number,
-  originX: number,
-  originY: number,
-  expandPx: number
-): THREE.Shape[] {
+// A blank white frame that every layer is drawn onto, so traced px coordinates
+// of text + icon line up across layers.
+function newFrame(W: number, H: number): CanvasRenderingContext2D {
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(8, Math.ceil(W));
   canvas.height = Math.max(8, Math.ceil(H));
   const ctx = canvas.getContext("2d")!;
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  return ctx;
+}
+
+// Paint the text black, optionally grown outward by `expandPx` (half line width).
+function drawTextOn(
+  ctx: CanvasRenderingContext2D,
+  spec: NameplateSpec,
+  fontPx: number,
+  originX: number,
+  originY: number,
+  expandPx: number
+) {
   ctx.font = fontString(spec, fontPx);
   ctx.letterSpacing = `${spec.letterSpacing}px`;
   ctx.textBaseline = "alphabetic";
@@ -121,7 +315,26 @@ function traceLayer(
   }
   ctx.fillStyle = "#000000";
   ctx.fillText(spec.text, originX, originY);
-  return traceCanvas(ctx, canvas.width, canvas.height);
+}
+
+// Paint an icon part black inside a [boxX,boxY] sizePx square. `growPx` enlarges
+// the box outward to approximate an outline halo for the stroke/base layers.
+function drawIconOn(
+  ctx: CanvasRenderingContext2D,
+  icon: Exclude<IconName, "none">,
+  part: IconPart,
+  boxX: number,
+  boxY: number,
+  sizePx: number,
+  growPx: number
+) {
+  const sz = sizePx + 2 * growPx;
+  ctx.save();
+  ctx.fillStyle = "#000000";
+  ctx.translate(boxX - growPx, boxY - growPx);
+  ctx.scale(sz / 100, sz / 100);
+  ICON_DRAW[icon](ctx, part);
+  ctx.restore();
 }
 
 function roundedRectShape(w: number, h: number, r: number): THREE.Shape {
@@ -186,62 +399,110 @@ export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResu
   const maxExpandPx = Math.max(strokeExpandPx, baseExpandPx);
 
   // shared canvas frame so all traced layers align
+  // optional decorative icon next to the text
+  const icon = spec.icon && spec.icon !== "none" ? spec.icon : null;
+  const iconDef = icon ? NAMEPLATE_ICONS.find((i) => i.name === icon) : null;
+  const iconHasAccent = !!iconDef?.accent;
+  const iconSizePx = icon ? textHpx * (spec.iconScale ?? 1.2) : 0;
+  const iconGapPx = icon ? textHpx * 0.18 : 0;
+  const iconSide = spec.iconPos === "right" ? "right" : "left";
+
+  // shared canvas frame so all traced layers align (text + icon)
   const padPx = Math.ceil(maxExpandPx) + 8;
-  const W = mi.textW + padPx * 2;
-  const H = textHpx + padPx * 2;
-  const originX = padPx;
-  const originY = padPx + mi.ascent;
+  const leftExtra = icon && iconSide === "left" ? iconSizePx + iconGapPx : 0;
+  const rightExtra = icon && iconSide === "right" ? iconSizePx + iconGapPx : 0;
+  const contentH = Math.max(textHpx, iconSizePx);
+  const W = mi.textW + padPx * 2 + leftExtra + rightExtra;
+  const H = contentH + padPx * 2;
+  const originX = padPx + leftExtra;
+  const originY = padPx + (contentH - textHpx) / 2 + mi.ascent;
+  const iconTop = padPx + (contentH - iconSizePx) / 2;
+  const iconX = iconSide === "left" ? padPx : originX + mi.textW + iconGapPx;
 
   const group = new THREE.Group();
   const textMat = new THREE.MeshStandardMaterial({ color: spec.color, roughness: 0.5, metalness: 0.05, side: THREE.DoubleSide });
   const baseMat = new THREE.MeshStandardMaterial({ color: spec.baseColor ?? spec.color, roughness: 0.6, metalness: 0.05, side: THREE.DoubleSide });
   const strokeMat = new THREE.MeshStandardMaterial({ color: spec.strokeColor ?? "#111827", roughness: 0.5, metalness: 0.05, side: THREE.DoubleSide });
+  const iconMat = new THREE.MeshStandardMaterial({ color: spec.iconColor ?? "#ef4444", roughness: 0.5, metalness: 0.05, side: THREE.DoubleSide });
+  const iconAccentMat = new THREE.MeshStandardMaterial({ color: spec.iconAccentColor ?? "#fde047", roughness: 0.5, metalness: 0.05, side: THREE.DoubleSide });
 
   const strokeBackZ = baseT;
   const textBackZ = baseT + strokeHmm;
 
   // --- text layer (frontmost) ---
-  const textShapes = traceLayer(spec, fontPx, W, H, originX, originY, 0);
+  const textCtx = newFrame(W, H);
+  drawTextOn(textCtx, spec, fontPx, originX, originY, 0);
+  const textShapes = traceCanvas(textCtx, textCtx.canvas.width, textCtx.canvas.height);
   let cx = 0,
-    cy = 0,
-    textWmm = spec.size * 2,
-    textHmm = spec.size;
+    cy = 0;
   if (textShapes.length) {
     const geo = extrudeLayer(textShapes, spec.thickness, k, bevelMM);
     geo.computeBoundingBox();
     const c = new THREE.Vector3();
-    const s = new THREE.Vector3();
     geo.boundingBox!.getCenter(c);
-    geo.boundingBox!.getSize(s);
     cx = c.x;
     cy = c.y;
-    textWmm = s.x;
-    textHmm = s.y;
     geo.translate(-cx, -cy, textBackZ);
     group.add(new THREE.Mesh(geo, textMat));
   }
 
-  // --- stroke layer (middle) ---
+  // --- icon layers (front, same level as the text) ---
+  if (icon) {
+    const mc = newFrame(W, H);
+    drawIconOn(mc, icon, "main", iconX, iconTop, iconSizePx, 0);
+    const mShapes = traceCanvas(mc, mc.canvas.width, mc.canvas.height);
+    if (mShapes.length) {
+      const geo = extrudeLayer(mShapes, spec.thickness, k, bevelMM);
+      geo.translate(-cx, -cy, textBackZ);
+      group.add(new THREE.Mesh(geo, iconMat));
+    }
+    if (iconHasAccent) {
+      const ac = newFrame(W, H);
+      drawIconOn(ac, icon, "accent", iconX, iconTop, iconSizePx, 0);
+      const aShapes = traceCanvas(ac, ac.canvas.width, ac.canvas.height);
+      if (aShapes.length) {
+        // raise the accent slightly so it reads as an inlay on top of the main color
+        const geo = extrudeLayer(aShapes, spec.thickness, k, bevelMM);
+        geo.translate(-cx, -cy, textBackZ + Math.min(0.5, spec.thickness * 0.4));
+        group.add(new THREE.Mesh(geo, iconAccentMat));
+      }
+    }
+  }
+
+  // --- stroke layer (middle): outline around text + icon ---
   if (hasStroke) {
-    const strokeShapes = traceLayer(spec, fontPx, W, H, originX, originY, strokeExpandPx);
-    if (strokeShapes.length) {
-      const geo = extrudeLayer(strokeShapes, strokeHmm, k, bevelMM);
+    const sc = newFrame(W, H);
+    drawTextOn(sc, spec, fontPx, originX, originY, strokeExpandPx);
+    if (icon) drawIconOn(sc, icon, "all", iconX, iconTop, iconSizePx, strokeExpandPx);
+    const sShapes = traceCanvas(sc, sc.canvas.width, sc.canvas.height);
+    if (sShapes.length) {
+      const geo = extrudeLayer(sShapes, strokeHmm, k, bevelMM);
       geo.translate(-cx, -cy, strokeBackZ);
       group.add(new THREE.Mesh(geo, strokeMat));
     }
   }
 
-  // --- base layer (back): rectangular OR contour-hugging the text ---
+  // --- base layer (back): rectangular OR contour-hugging the text + icon ---
   if (spec.edge === "contour") {
-    const baseShapes = traceLayer(spec, fontPx, W, H, originX, originY, baseExpandPx);
-    if (baseShapes.length) {
-      const geo = extrudeLayer(baseShapes, baseT, k, 0);
+    const bc = newFrame(W, H);
+    drawTextOn(bc, spec, fontPx, originX, originY, baseExpandPx);
+    if (icon) drawIconOn(bc, icon, "all", iconX, iconTop, iconSizePx, baseExpandPx);
+    const bShapes = traceCanvas(bc, bc.canvas.width, bc.canvas.height);
+    if (bShapes.length) {
+      const geo = extrudeLayer(bShapes, baseT, k, 0);
       geo.translate(-cx, -cy, 0);
       group.add(new THREE.Mesh(geo, baseMat));
     }
   } else {
-    const plateW = textWmm + padMM * 2;
-    const plateH = textHmm + padMM * 2;
+    // rectangular/rounded plate sized to enclose everything added so far
+    group.updateMatrixWorld(true);
+    const cbox = new THREE.Box3().setFromObject(group);
+    const cw = cbox.max.x - cbox.min.x;
+    const ch = cbox.max.y - cbox.min.y;
+    const ccx = (cbox.max.x + cbox.min.x) / 2;
+    const ccy = (cbox.max.y + cbox.min.y) / 2;
+    const plateW = cw + padMM * 2;
+    const plateH = ch + padMM * 2;
     const r = spec.edge === "round" ? Math.min(plateW, plateH) * 0.18 : 0.4;
     const baseGeo = new THREE.ExtrudeGeometry(roundedRectShape(plateW, plateH, r), {
       depth: baseT,
@@ -250,6 +511,7 @@ export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResu
       bevelSize: 0.5,
       bevelSegments: 2,
     });
+    baseGeo.translate(ccx, ccy, 0);
     group.add(new THREE.Mesh(baseGeo, baseMat));
   }
 

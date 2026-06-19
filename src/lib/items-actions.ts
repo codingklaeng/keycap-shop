@@ -151,6 +151,7 @@ export async function saveNameplateConfig(input: {
   price_per_size_mm: number;
   price_per_mm_thick: number;
   stroke_surcharge: number;
+  icon_surcharge: number;
   active: boolean;
 }) {
   const sb = await guard();
