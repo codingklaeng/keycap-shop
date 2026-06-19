@@ -31,7 +31,7 @@ export default async function ItemsPage() {
       sb.from("keycap_stock").select("*"),
       sb.from("pendants").select("*").order("sort_order"),
       sb.from("social_platforms").select("*").order("sort_order"),
-      sb.from("nameplate_config").select("base_price,price_per_char,price_per_size_mm,price_per_mm_thick,stroke_surcharge,icon_surcharge,active").eq("id", 1).maybeSingle(),
+      sb.from("nameplate_config").select("base_price,price_per_char,price_per_size_mm,price_per_mm_thick,stroke_surcharge,icon_surcharge,min_deposit_percent,active").eq("id", 1).maybeSingle(),
     ]);
 
   return (
@@ -54,6 +54,7 @@ export default async function ItemsPage() {
             price_per_mm_thick: 5,
             stroke_surcharge: 30,
             icon_surcharge: 20,
+            min_deposit_percent: 50,
             active: true,
           }
         }

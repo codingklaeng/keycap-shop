@@ -113,6 +113,8 @@ export type OrderDetail = {
   status: OrderStatus;
   text: string;
   total_price: number;
+  paid_amount: number;
+  deposit_required: number;
   note: string | null;
   created_at: string;
   product_type: "keycap" | "nfc" | "nameplate";

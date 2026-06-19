@@ -208,9 +208,17 @@ export function OrderStatus({ id }: { id: string }) {
             {formatBaht(Number(order.total_price))}
           </span>
         </div>
-        <p className="mt-1 text-right text-xs text-muted">
-          ชำระเงินตอนมารับสินค้า
-        </p>
+        {order.product_type === "nameplate" ? (
+          <PaymentNote
+            total={Number(order.total_price)}
+            paid={Number(order.paid_amount)}
+            deposit={Number(order.deposit_required)}
+          />
+        ) : (
+          <p className="mt-1 text-right text-xs text-muted">
+            ชำระเงินตอนมารับสินค้า
+          </p>
+        )}
       </div>
 
       <Link
@@ -220,6 +228,48 @@ export function OrderStatus({ id }: { id: string }) {
         สั่งเพิ่มอีกชิ้น
       </Link>
     </main>
+  );
+}
+
+function PaymentNote({
+  total,
+  paid,
+  deposit,
+}: {
+  total: number;
+  paid: number;
+  deposit: number;
+}) {
+  const remaining = Math.max(0, total - paid);
+  const depositMet = paid >= deposit - 0.001;
+  return (
+    <div className="mt-2 space-y-1 border-t border-border pt-2 text-sm">
+      <div className="flex justify-between">
+        <span className="text-muted">ชำระแล้ว</span>
+        <span className="font-medium">{formatBaht(paid)}</span>
+      </div>
+      <div className="flex justify-between">
+        <span className="text-muted">คงเหลือ</span>
+        <span className="font-medium">{formatBaht(remaining)}</span>
+      </div>
+      {paid <= 0 ? (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900">
+          ต้องชำระมัดจำอย่างน้อย {formatBaht(deposit)} ก่อน ทางร้านจึงจะเริ่มผลิต
+        </p>
+      ) : !depositMet ? (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-900">
+          ยอดมัดจำขั้นต่ำ {formatBaht(deposit)} — ขาดอีก {formatBaht(Math.max(0, deposit - paid))} จึงจะเริ่มผลิต
+        </p>
+      ) : remaining > 0 ? (
+        <p className="rounded-lg bg-green-50 px-3 py-2 text-green-800">
+          ครบมัดจำแล้ว กำลังดำเนินการ · ชำระส่วนที่เหลือ {formatBaht(remaining)} ตอนรับสินค้า
+        </p>
+      ) : (
+        <p className="rounded-lg bg-green-50 px-3 py-2 text-green-800">
+          ชำระครบแล้ว ขอบคุณค่ะ
+        </p>
+      )}
+    </div>
   );
 }
 

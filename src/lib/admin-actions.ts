@@ -38,6 +38,40 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
   if (error) throw new Error(error.message);
 }
 
+// Record how much the customer has paid so far (admin enters it manually).
+export async function setOrderPaid(id: string, amount: number) {
+  if (!(await isAdmin())) throw new Error("unauthorized");
+  const sb = createAdminClient();
+  const paid = Math.max(0, Math.round(amount * 100) / 100);
+  const { error } = await sb.from("orders").update({ paid_amount: paid }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// Admin edits a nameplate order's design spec (for print suitability).
+export async function saveNameplateSpec(orderId: string, spec: unknown, text: string) {
+  if (!(await isAdmin())) throw new Error("unauthorized");
+  const sb = createAdminClient();
+  const { error } = await sb
+    .from("order_nameplate")
+    .update({ spec, text })
+    .eq("order_id", orderId);
+  if (error) throw new Error(error.message);
+  // keep the order's display text in sync with the edited nameplate text
+  await sb.from("orders").update({ text }).eq("id", orderId);
+}
+
+// The minimum-deposit % that must be paid before a nameplate goes into production.
+export async function getDepositPercent(): Promise<number> {
+  if (!(await isAdmin())) throw new Error("unauthorized");
+  const sb = createAdminClient();
+  const { data } = await sb
+    .from("nameplate_config")
+    .select("min_deposit_percent")
+    .eq("id", 1)
+    .maybeSingle();
+  return Number(data?.min_deposit_percent ?? 0);
+}
+
 // Cancel + restock atomically (via SQL function)
 export async function cancelOrder(id: string) {
   if (!(await isAdmin())) throw new Error("unauthorized");
@@ -47,7 +81,7 @@ export async function cancelOrder(id: string) {
 }
 
 const BOARD_SELECT =
-  "id,queue_number,queue_date,status,text,total_price,note,created_at,product_type,layout," +
+  "id,queue_number,queue_date,status,text,total_price,paid_amount,note,created_at,product_type,layout," +
   "customer_name,customer_contact," +
   "base_sizes(max_chars,base_types(name)),base_colors(name,swatch),pendants(name)," +
   "order_letters(position,char,keycap_colors(name,key_color,text_color))," +

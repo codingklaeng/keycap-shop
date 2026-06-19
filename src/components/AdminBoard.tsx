@@ -5,6 +5,8 @@ import {
   updateOrderStatus,
   cancelOrder,
   getTodayOrders,
+  setOrderPaid,
+  getDepositPercent,
 } from "@/lib/admin-actions";
 import { formatBaht } from "@/lib/price";
 import { ORDER_STATUS_LABEL, type OrderStatus } from "@/lib/types";
@@ -12,6 +14,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { announceQueue, primeAudio } from "@/lib/announce";
 import { VoiceSettingsPanel } from "@/components/VoiceSettingsPanel";
 import { DownloadStlButton } from "@/components/DownloadStlButton";
+import { NameplateEditorModal } from "@/components/NameplateEditorModal";
 import type { NameplateSpec } from "@/lib/nameplate";
 
 type BoardLetter = {
@@ -33,6 +36,7 @@ type BoardOrder = {
   status: OrderStatus;
   text: string;
   total_price: number;
+  paid_amount: number;
   note: string | null;
   created_at: string;
   product_type: "keycap" | "nfc" | "nameplate";
@@ -88,6 +92,8 @@ export function AdminBoard({ today }: { today: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [soundOn, setSoundOn] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
+  const [depositPct, setDepositPct] = useState(0);
+  const [editing, setEditing] = useState<BoardOrder | null>(null);
   const announced = useRef<Set<string>>(new Set());
   const seeded = useRef(false);
 
@@ -95,6 +101,7 @@ export function AdminBoard({ today }: { today: string }) {
     try {
       setSoundOn(localStorage.getItem("keycap_sound") === "1");
     } catch {}
+    getDepositPercent().then(setDepositPct).catch(() => {});
   }, []);
 
   const load = useCallback(async () => {
@@ -150,6 +157,17 @@ export function AdminBoard({ today }: { today: string }) {
       load();
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function changePaid(id: string, amount: number) {
+    setOrders((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, paid_amount: amount } : o))
+    );
+    try {
+      await setOrderPaid(id, amount);
+    } catch {
+      load();
     }
   }
 
@@ -220,8 +238,11 @@ export function AdminBoard({ today }: { today: string }) {
             order={o}
             today={today}
             busy={busy === o.id}
+            depositPct={depositPct}
             onAdvance={changeStatus}
             onCancel={(id) => cancel(id)}
+            onSetPaid={changePaid}
+            onEdit={() => setEditing(o)}
             onAnnounce={() => announceQueue(o.queue_number, o.customer_name)}
           />
         ))}
@@ -246,6 +267,19 @@ export function AdminBoard({ today }: { today: string }) {
           </div>
         </details>
       )}
+
+      {editing && nameplateOf(editing) && (
+        <NameplateEditorModal
+          orderId={editing.id}
+          queueNumber={editing.queue_number}
+          initialSpec={nameplateOf(editing)!.spec}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            load();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -254,15 +288,21 @@ function OrderCard({
   order,
   today,
   busy,
+  depositPct,
   onAdvance,
   onCancel,
+  onSetPaid,
+  onEdit,
   onAnnounce,
 }: {
   order: BoardOrder;
   today: string;
   busy: boolean;
+  depositPct: number;
   onAdvance: (id: string, to: OrderStatus) => void;
   onCancel: (id: string) => void;
+  onSetPaid: (id: string, amount: number) => void;
+  onEdit: () => void;
   onAnnounce: () => void;
 }) {
   const next = NEXT_ACTION[order.status];
@@ -274,6 +314,16 @@ function OrderCard({
   const nfc = nfcOf(order);
   const np = nameplateOf(order);
   const isOld = order.queue_date !== today;
+
+  // nameplate payment gating: production may start once the deposit is met
+  const total = Number(order.total_price);
+  const paid = Number(order.paid_amount);
+  const depositNeed = Math.round((total * depositPct) / 100 * 100) / 100;
+  const depositMet = paid >= depositNeed - 0.001;
+  const [payInput, setPayInput] = useState(String(paid));
+  useEffect(() => setPayInput(String(paid)), [paid]);
+  // block "start" on a nameplate until the deposit is recorded
+  const startBlocked = isNameplate && order.status === "pending" && !depositMet;
 
   return (
     <div
@@ -331,12 +381,63 @@ function OrderCard({
             <Info label="ห่วง" value={ringLabel(np?.spec.ring)} />
             <Info label="ราคา" value={formatBaht(Number(order.total_price))} />
           </dl>
-          {np && (
-            <DownloadStlButton
-              spec={np.spec}
-              filename={`${order.queue_number}-${np.text}.stl`}
-            />
-          )}
+          <div className="flex gap-2">
+            {np && (
+              <DownloadStlButton
+                spec={np.spec}
+                filename={`${order.queue_number}-${np.text}.stl`}
+              />
+            )}
+            <button
+              onClick={onEdit}
+              className="rounded-xl border border-border px-3 py-2 text-sm font-medium text-muted hover:text-foreground"
+            >
+              ✏️ แก้ไขแบบ
+            </button>
+          </div>
+
+          {/* payment (admin records the amount manually) */}
+          <div className="rounded-lg bg-background px-3 py-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted">ชำระแล้ว</span>
+              <span className="font-medium">
+                {formatBaht(paid)} / {formatBaht(total)}
+              </span>
+            </div>
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                step="1"
+                value={payInput}
+                onChange={(e) => setPayInput(e.target.value)}
+                className="w-24 rounded-lg border border-border bg-card px-2 py-1 text-sm"
+              />
+              <button
+                onClick={() => onSetPaid(order.id, Math.max(0, Number(payInput) || 0))}
+                className="rounded-lg border border-primary px-3 py-1 text-sm font-medium text-primary"
+              >
+                บันทึกยอด
+              </button>
+              <button
+                onClick={() => onSetPaid(order.id, total)}
+                className="rounded-lg border border-border px-2 py-1 text-xs text-muted"
+              >
+                เต็มจำนวน
+              </button>
+            </div>
+            <div className="mt-1.5">
+              {depositMet ? (
+                <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-800">
+                  ✓ ครบมัดจำ · พร้อมผลิต
+                </span>
+              ) : (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                  รอมัดจำ (≥{depositPct}% = {formatBaht(depositNeed)}) · ขาด {formatBaht(Math.max(0, depositNeed - paid))}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       ) : isNfc ? (
         /* NFC: show platform + handle + generated url to write to the tag */
@@ -406,11 +507,12 @@ function OrderCard({
       <div className="mt-3 flex gap-2">
         {next && (
           <button
-            disabled={busy}
+            disabled={busy || startBlocked}
             onClick={() => onAdvance(order.id, next.to)}
+            title={startBlocked ? "ต้องบันทึกยอดมัดจำให้ครบก่อนจึงเริ่มผลิตได้" : undefined}
             className="flex-1 rounded-xl bg-primary px-4 py-2.5 font-semibold text-primary-foreground disabled:opacity-50"
           >
-            {next.label}
+            {startBlocked ? "🔒 รอมัดจำก่อนเริ่ม" : next.label}
           </button>
         )}
         {order.status === "ready" && (
