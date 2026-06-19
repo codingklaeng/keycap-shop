@@ -101,7 +101,9 @@ export function NameplateCanvas({
         <OrbitControls
           makeDefault
           enablePan={false}
-          enableZoom={false}
+          enableZoom
+          minDistance={12}
+          maxDistance={600}
           autoRotate={spinning}
           autoRotateSpeed={1.4}
           minPolarAngle={Math.PI / 4}

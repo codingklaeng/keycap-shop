@@ -19,6 +19,8 @@ export type NameplateSpec = {
   ring: RingPos;
   ringDiameter?: number; // outer Ø of the keyring loop (mm)
   ringThickness?: number; // bar/tube thickness of the loop (mm)
+  ringOffsetX?: number; // nudge the ring along x (mm)
+  ringOffsetY?: number; // nudge the ring along y (mm)
   baseThickness: number; // backing plate depth (mm)
   color: string; // text color (preview)
   baseColor?: string; // base plate + ring color (preview)
@@ -34,6 +36,8 @@ export type NameplateSpec = {
   iconScale?: number; // icon height relative to the text height
   iconColor?: string; // main icon color
   iconAccentColor?: string; // 2nd-tone color (flower center, star inner, …)
+  iconOffsetX?: number; // nudge the icon along x (mm); may overlap the text
+  iconOffsetY?: number; // nudge the icon along y (mm)
 };
 
 export type IconName =
@@ -398,7 +402,6 @@ export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResu
   const baseExpandPx = spec.edge === "contour" ? contourExpandMM / k : 0;
   const maxExpandPx = Math.max(strokeExpandPx, baseExpandPx);
 
-  // shared canvas frame so all traced layers align
   // optional decorative icon next to the text
   const icon = spec.icon && spec.icon !== "none" ? spec.icon : null;
   const iconDef = icon ? NAMEPLATE_ICONS.find((i) => i.name === icon) : null;
@@ -407,17 +410,44 @@ export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResu
   const iconGapPx = icon ? textHpx * 0.18 : 0;
   const iconSide = spec.iconPos === "right" ? "right" : "left";
 
-  // shared canvas frame so all traced layers align (text + icon)
+  // Lay text + icon out in a working space (text top-left = origin), apply the
+  // icon offset (which may push it onto the text), then size the canvas to the
+  // union ± padding so nothing ever clips regardless of offsets.
+  const textRect = { x: 0, y: 0, w: mi.textW, h: textHpx };
+  const iconRect =
+    icon
+      ? {
+          x:
+            (iconSide === "left" ? -(iconGapPx + iconSizePx) : mi.textW + iconGapPx) +
+            (spec.iconOffsetX ?? 0) / k,
+          y: (textHpx - iconSizePx) / 2 - (spec.iconOffsetY ?? 0) / k,
+          w: iconSizePx,
+          h: iconSizePx,
+        }
+      : null;
+
+  let minX = textRect.x;
+  let minY = textRect.y;
+  let maxX = textRect.x + textRect.w;
+  let maxY = textRect.y + textRect.h;
+  if (iconRect) {
+    minX = Math.min(minX, iconRect.x);
+    minY = Math.min(minY, iconRect.y);
+    maxX = Math.max(maxX, iconRect.x + iconRect.w);
+    maxY = Math.max(maxY, iconRect.y + iconRect.h);
+  }
+
   const padPx = Math.ceil(maxExpandPx) + 8;
-  const leftExtra = icon && iconSide === "left" ? iconSizePx + iconGapPx : 0;
-  const rightExtra = icon && iconSide === "right" ? iconSizePx + iconGapPx : 0;
-  const contentH = Math.max(textHpx, iconSizePx);
-  const W = mi.textW + padPx * 2 + leftExtra + rightExtra;
-  const H = contentH + padPx * 2;
-  const originX = padPx + leftExtra;
-  const originY = padPx + (contentH - textHpx) / 2 + mi.ascent;
-  const iconTop = padPx + (contentH - iconSizePx) / 2;
-  const iconX = iconSide === "left" ? padPx : originX + mi.textW + iconGapPx;
+  const dx = padPx - minX;
+  const dy = padPx - minY;
+  const W = maxX - minX + padPx * 2;
+  const H = maxY - minY + padPx * 2;
+  const originX = textRect.x + dx;
+  const originY = textRect.y + dy + mi.ascent;
+  const iconX = iconRect ? iconRect.x + dx : 0;
+  const iconTop = iconRect ? iconRect.y + dy : 0;
+  // gap carved out of the icon where the text overlaps it (text wins)
+  const carvePx = Math.max(0.35 / k, 1);
 
   const group = new THREE.Group();
   const textMat = new THREE.MeshStandardMaterial({ color: spec.color, roughness: 0.5, metalness: 0.05, side: THREE.DoubleSide });
@@ -447,9 +477,18 @@ export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResu
   }
 
   // --- icon layers (front, same level as the text) ---
+  // Where the icon overlaps the text, the text is carved out of the icon so the
+  // text always reads cleanly on top (the icon gets notched).
+  const carveText = (ctx: CanvasRenderingContext2D) => {
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-out";
+    drawTextOn(ctx, spec, fontPx, originX, originY, carvePx);
+    ctx.restore();
+  };
   if (icon) {
     const mc = newFrame(W, H);
     drawIconOn(mc, icon, "main", iconX, iconTop, iconSizePx, 0);
+    carveText(mc);
     const mShapes = traceCanvas(mc, mc.canvas.width, mc.canvas.height);
     if (mShapes.length) {
       const geo = extrudeLayer(mShapes, spec.thickness, k, bevelMM);
@@ -459,6 +498,7 @@ export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResu
     if (iconHasAccent) {
       const ac = newFrame(W, H);
       drawIconOn(ac, icon, "accent", iconX, iconTop, iconSizePx, 0);
+      carveText(ac);
       const aShapes = traceCanvas(ac, ac.canvas.width, ac.canvas.height);
       if (aShapes.length) {
         // raise the accent slightly so it reads as an inlay on top of the main color
@@ -539,6 +579,8 @@ export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResu
     if (spec.ring === "left") rx = pbox.min.x - rOuter * 0.7;
     else if (spec.ring === "right") rx = pbox.max.x + rOuter * 0.7;
     else ry = pbox.max.y + rOuter * 0.7; // top
+    rx += spec.ringOffsetX ?? 0;
+    ry += spec.ringOffsetY ?? 0;
     // the lowest point of the ring sits flush with the base bottom (z = 0) so
     // it doesn't dip below the plate when the piece is printed lying flat.
     ringGeo.translate(rx, ry, tube);

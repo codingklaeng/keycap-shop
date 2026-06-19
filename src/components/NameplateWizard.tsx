@@ -34,11 +34,15 @@ const DEFAULT: NameplateSpec = {
   ring: "left",
   ringDiameter: 12,
   ringThickness: 3.5,
+  ringOffsetX: 0,
+  ringOffsetY: 0,
   icon: "none",
   iconPos: "left",
   iconScale: 1.2,
   iconColor: "#ef4444",
   iconAccentColor: "#fde047",
+  iconOffsetX: 0,
+  iconOffsetY: 0,
   baseThickness: 3,
   color: "#6d28d9",
   baseColor: "#e5e7eb",
@@ -258,12 +262,20 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
         </Field>
 
         {spec.ring !== "none" && (
-          <div className="grid grid-cols-2 gap-3">
-            <Slider label="เส้นผ่านศูนย์กลางห่วง" unit="มม." min={6} max={20} step={0.5}
-              value={spec.ringDiameter ?? 12} onChange={(v) => set("ringDiameter", v)} />
-            <Slider label="ความหนาห่วง" unit="มม." min={1} max={5} step={0.5}
-              value={spec.ringThickness ?? 3.5} onChange={(v) => set("ringThickness", v)} />
-          </div>
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Slider label="เส้นผ่านศูนย์กลางห่วง" unit="มม." min={6} max={20} step={0.5}
+                value={spec.ringDiameter ?? 12} onChange={(v) => set("ringDiameter", v)} />
+              <Slider label="ความหนาห่วง" unit="มม." min={1} max={5} step={0.5}
+                value={spec.ringThickness ?? 3.5} onChange={(v) => set("ringThickness", v)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Slider label="เลื่อนห่วง ←→" unit="มม." min={-15} max={15} step={0.5}
+                value={spec.ringOffsetX ?? 0} onChange={(v) => set("ringOffsetX", v)} />
+              <Slider label="เลื่อนห่วง ↑↓" unit="มม." min={-15} max={15} step={0.5}
+                value={spec.ringOffsetY ?? 0} onChange={(v) => set("ringOffsetY", v)} />
+            </div>
+          </>
         )}
 
         <div className="grid grid-cols-2 gap-3">
@@ -375,6 +387,15 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
                   </Field>
                 )}
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Slider label="เลื่อนไอคอน ←→" unit="มม." min={-30} max={30} step={0.5}
+                  value={spec.iconOffsetX ?? 0} onChange={(v) => set("iconOffsetX", v)} />
+                <Slider label="เลื่อนไอคอน ↑↓" unit="มม." min={-20} max={20} step={0.5}
+                  value={spec.iconOffsetY ?? 0} onChange={(v) => set("iconOffsetY", v)} />
+              </div>
+              <p className="text-[11px] text-muted">
+                เลื่อนไอคอนให้ทับตัวอักษรได้ — ส่วนที่ทับ ตัวอักษรจะเป็นตัวหลัก ไอคอนจะเว้าตามรอยตัวอักษร
+              </p>
             </>
           )}
         </div>

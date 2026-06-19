@@ -228,11 +228,14 @@ export function KeycapScene(props: Props) {
             <Model {...props} />
           </group>
         </SpinGroup>
-        {/* manual inspection enabled only when not auto-spinning */}
+        {/* zoom (incl. pinch) always available; manual rotate only when paused
+            so it doesn't fight the auto-spin */}
         <OrbitControls
-          enabled={!spinning}
-          enableZoom={false}
+          enableZoom
           enablePan={false}
+          enableRotate={!spinning}
+          minDistance={dist * 0.45}
+          maxDistance={dist * 1.8}
           minPolarAngle={Math.PI / 4}
           maxPolarAngle={(3 * Math.PI) / 4}
         />
@@ -245,11 +248,9 @@ export function KeycapScene(props: Props) {
       >
         {spinning ? "⏸ หยุดหมุน" : "↻ หมุน"}
       </button>
-      {!spinning && (
-        <span className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[10px] text-muted">
-          ลากเพื่อหมุนดูรอบด้าน
-        </span>
-      )}
+      <span className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-[10px] text-muted">
+        {spinning ? "ถ่างนิ้ว/สกอลล์เพื่อซูม" : "ลากเพื่อหมุน · ถ่างนิ้วเพื่อซูม"}
+      </span>
     </div>
   );
 }
