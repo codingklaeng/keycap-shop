@@ -264,12 +264,45 @@ function measureTextPx(spec: NameplateSpec, fontPx: number): TextMetricsInfo {
   };
 }
 
+// separable box blur of a scalar field — softens the hard pixel-grid edges so
+// the traced contour is a smooth curve instead of a zig-zag of 1px steps
+// (which otherwise show up as vertical striations on the extruded walls).
+function boxBlur(src: Float32Array, W: number, H: number, r: number): Float32Array {
+  if (r < 1) return src;
+  const win = 2 * r + 1;
+  const tmp = new Float32Array(W * H);
+  const out = new Float32Array(W * H);
+  const clamp = (v: number, hi: number) => (v < 0 ? 0 : v > hi ? hi : v);
+  for (let y = 0; y < H; y++) {
+    const row = y * W;
+    let acc = 0;
+    for (let x = -r; x <= r; x++) acc += src[row + clamp(x, W - 1)];
+    for (let x = 0; x < W; x++) {
+      tmp[row + x] = acc / win;
+      acc += src[row + clamp(x + r + 1, W - 1)] - src[row + clamp(x - r, W - 1)];
+    }
+  }
+  for (let x = 0; x < W; x++) {
+    let acc = 0;
+    for (let y = -r; y <= r; y++) acc += tmp[clamp(y, H - 1) * W + x];
+    for (let y = 0; y < H; y++) {
+      out[y * W + x] = acc / win;
+      acc += tmp[clamp(y + r + 1, H - 1) * W + x] - tmp[clamp(y - r, H - 1) * W + x];
+    }
+  }
+  return out;
+}
+
 // contour-trace a B/W canvas into polygons with holes (marching squares)
 function traceCanvas(ctx: CanvasRenderingContext2D, W: number, H: number): THREE.Shape[] {
   const px = ctx.getImageData(0, 0, W, H).data;
-  const values = new Array<number>(W * H);
-  for (let i = 0; i < W * H; i++) values[i] = 255 - px[i * 4]; // dark = high
-  const result = contours().size([W, H]).smooth(true).thresholds([128])(values);
+  const raw = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) raw[i] = 255 - px[i * 4]; // dark = high
+  const values = boxBlur(raw, W, H, 2);
+  const result = contours()
+    .size([W, H])
+    .smooth(true)
+    .thresholds([128])(values as unknown as number[]);
   const multi = (result[0]?.coordinates ?? []) as number[][][][];
   const shapes: THREE.Shape[] = [];
   for (const poly of multi) {
@@ -385,9 +418,9 @@ function extrudeLayer(
 export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResult> {
   await ensureFont(spec);
   // Higher render resolution → the marching-squares contour follows curves much
-  // more finely, so the exported STL has far fewer facets. (2.5× the original
-  // 140px; kept moderate so the mesh/file and mobile compute stay reasonable.)
-  const fontPx = 360;
+  // more finely; combined with boxBlur on the raster (smooths the pixel-grid
+  // zig-zag) this removes the faceting / vertical striations on the walls.
+  const fontPx = 480;
   const mi = measureTextPx(spec, fontPx);
   const textHpx = mi.ascent + mi.descent;
   const k = spec.size / Math.max(1, textHpx); // mm per px (from metrics)
