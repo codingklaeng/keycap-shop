@@ -264,37 +264,6 @@ function measureTextPx(spec: NameplateSpec, fontPx: number): TextMetricsInfo {
   };
 }
 
-// Ramer–Douglas–Peucker: drop near-collinear points from a ring so a
-// high-resolution contour keeps its smooth shape with far fewer vertices.
-function simplifyRing(pts: number[][], eps: number): number[][] {
-  if (pts.length < 4) return pts;
-  const keep = new Uint8Array(pts.length);
-  keep[0] = keep[pts.length - 1] = 1;
-  const stack: [number, number][] = [[0, pts.length - 1]];
-  while (stack.length) {
-    const [a, b] = stack.pop()!;
-    const [ax, ay] = pts[a];
-    const [bx, by] = pts[b];
-    const dx = bx - ax;
-    const dy = by - ay;
-    const len = Math.hypot(dx, dy) || 1;
-    let dmax = 0;
-    let idx = -1;
-    for (let i = a + 1; i < b; i++) {
-      const d = Math.abs((pts[i][0] - ax) * dy - (pts[i][1] - ay) * dx) / len;
-      if (d > dmax) {
-        dmax = d;
-        idx = i;
-      }
-    }
-    if (dmax > eps && idx > 0) {
-      keep[idx] = 1;
-      stack.push([a, idx], [idx, b]);
-    }
-  }
-  return pts.filter((_, i) => keep[i]);
-}
-
 // contour-trace a B/W canvas into polygons with holes (marching squares)
 function traceCanvas(ctx: CanvasRenderingContext2D, W: number, H: number): THREE.Shape[] {
   const px = ctx.getImageData(0, 0, W, H).data;
@@ -302,19 +271,14 @@ function traceCanvas(ctx: CanvasRenderingContext2D, W: number, H: number): THREE
   for (let i = 0; i < W * H; i++) values[i] = 255 - px[i * 4]; // dark = high
   const result = contours().size([W, H]).smooth(true).thresholds([128])(values);
   const multi = (result[0]?.coordinates ?? []) as number[][][][];
-  const eps = 0.6; // px tolerance (rendered at high res, so this is sub-0.05mm)
   const shapes: THREE.Shape[] = [];
   for (const poly of multi) {
     if (!poly.length || poly[0].length < 3) continue;
-    const outer = simplifyRing(poly[0], eps);
-    if (outer.length < 3) continue;
     const shape = new THREE.Shape();
-    outer.forEach((p, i) => (i ? shape.lineTo(p[0], p[1]) : shape.moveTo(p[0], p[1])));
+    poly[0].forEach((p, i) => (i ? shape.lineTo(p[0], p[1]) : shape.moveTo(p[0], p[1])));
     for (let hi = 1; hi < poly.length; hi++) {
-      const ring = simplifyRing(poly[hi], eps);
-      if (ring.length < 3) continue;
       const hole = new THREE.Path();
-      ring.forEach((p, i) => (i ? hole.lineTo(p[0], p[1]) : hole.moveTo(p[0], p[1])));
+      poly[hi].forEach((p, i) => (i ? hole.lineTo(p[0], p[1]) : hole.moveTo(p[0], p[1])));
       shape.holes.push(hole);
     }
     shapes.push(shape);
@@ -420,10 +384,10 @@ function extrudeLayer(
 /** Build the full nameplate (base + optional stroke + text + ring) in mm. */
 export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResult> {
   await ensureFont(spec);
-  // High render resolution → the marching-squares contour follows curves much
-  // more finely (fewer facets in the exported STL); simplifyRing trims the
-  // redundant points so the mesh/file stays light.
-  const fontPx = 480;
+  // Higher render resolution → the marching-squares contour follows curves much
+  // more finely, so the exported STL has far fewer facets. (2.5× the original
+  // 140px; kept moderate so the mesh/file and mobile compute stay reasonable.)
+  const fontPx = 360;
   const mi = measureTextPx(spec, fontPx);
   const textHpx = mi.ascent + mi.descent;
   const k = spec.size / Math.max(1, textHpx); // mm per px (from metrics)
