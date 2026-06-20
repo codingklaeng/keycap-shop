@@ -41,6 +41,13 @@ export default function Home() {
 
         <TrackOrderButton />
 
+        <Link
+          href="/track"
+          className="mt-3 block text-sm text-muted underline transition hover:text-foreground"
+        >
+          ติดตามออเดอร์ด้วยเบอร์โทร
+        </Link>
+
         <p className="mt-10 text-xs text-muted">
           ชำระเงินตอนมารับสินค้า · ไม่ต้องสมัครสมาชิก
         </p>

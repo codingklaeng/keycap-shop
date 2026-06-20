@@ -88,15 +88,16 @@ const BOARD_SELECT =
   "order_nfc(social_value,social_url,social_platforms(name,icon,image_url))," +
   "order_nameplate(text,spec)";
 
-// Read the board: today's orders + any older order still waiting to be picked
-// up ('ready' from a previous day) so the shop can chase no-shows.
+// Read the board: today's orders + every still-unfinished order from any day
+// (pending / in_progress / ready) — so overnight 3D-print jobs and no-shows
+// never fall off the board when the date rolls over.
 export async function getTodayOrders(today: string) {
   if (!(await isAdmin())) throw new Error("unauthorized");
   const sb = createAdminClient();
   const { data, error } = await sb
     .from("orders")
     .select(BOARD_SELECT)
-    .or(`queue_date.eq.${today},status.eq.ready`)
+    .or(`queue_date.eq.${today},status.in.(pending,in_progress,ready)`)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
   return data ?? [];
