@@ -581,6 +581,10 @@ export async function buildNameplate(
     if (icon) drawIconOn(bc, icon, "all", iconX, iconTop, iconSizePx, baseExpandPx);
     const bShapes = traceCanvas(bc, bc.canvas.width, bc.canvas.height, blurR);
     if (bShapes.length) {
+      // The base is a SOLID plate: drop the inner holes (letter counters) so the
+      // text never appears inside the base layers — the text is its own raised
+      // layer sitting on top of this solid plate.
+      for (const s of bShapes) s.holes = [];
       const geo = extrudeLayer(bShapes, baseT, k, 0);
       geo.translate(-cx, -cy, 0);
       group.add(new THREE.Mesh(geo, baseMat));
