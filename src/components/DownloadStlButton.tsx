@@ -23,7 +23,8 @@ export function DownloadStlButton({
       onClick={async () => {
         setBusy(true);
         try {
-          const { group } = await buildNameplate(spec);
+          // regenerate at maximum smoothness for the printable file
+          const { group } = await buildNameplate(spec, "export");
           downloadBlob(exportSTL(group), filename);
         } catch {
           alert("สร้างไฟล์ STL ไม่สำเร็จ");

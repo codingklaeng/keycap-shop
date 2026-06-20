@@ -294,11 +294,16 @@ function boxBlur(src: Float32Array, W: number, H: number, r: number): Float32Arr
 }
 
 // contour-trace a B/W canvas into polygons with holes (marching squares)
-function traceCanvas(ctx: CanvasRenderingContext2D, W: number, H: number): THREE.Shape[] {
+function traceCanvas(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  blurR: number
+): THREE.Shape[] {
   const px = ctx.getImageData(0, 0, W, H).data;
   const raw = new Float32Array(W * H);
   for (let i = 0; i < W * H; i++) raw[i] = 255 - px[i * 4]; // dark = high
-  const values = boxBlur(raw, W, H, 2);
+  const values = boxBlur(raw, W, H, blurR);
   const result = contours()
     .size([W, H])
     .smooth(true)
@@ -414,13 +419,21 @@ function extrudeLayer(
   return geo;
 }
 
-/** Build the full nameplate (base + optional stroke + text + ring) in mm. */
-export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResult> {
+export type BuildQuality = "preview" | "export";
+
+/** Build the full nameplate (base + optional stroke + text + ring) in mm.
+ *  `quality` trades render resolution for speed: "preview" stays light/snappy
+ *  on screen, "export" maxes out smoothness for the downloaded STL. */
+export async function buildNameplate(
+  spec: NameplateSpec,
+  quality: BuildQuality = "preview"
+): Promise<NameplateResult> {
   await ensureFont(spec);
   // Higher render resolution → the marching-squares contour follows curves much
   // more finely; combined with boxBlur on the raster (smooths the pixel-grid
   // zig-zag) this removes the faceting / vertical striations on the walls.
-  const fontPx = 480;
+  const fontPx = quality === "export" ? 720 : 360;
+  const blurR = quality === "export" ? 3 : 2;
   const mi = measureTextPx(spec, fontPx);
   const textHpx = mi.ascent + mi.descent;
   const k = spec.size / Math.max(1, textHpx); // mm per px (from metrics)
@@ -498,7 +511,7 @@ export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResu
   // --- text layer (frontmost) ---
   const textCtx = newFrame(W, H);
   drawTextOn(textCtx, spec, fontPx, originX, originY, 0);
-  const textShapes = traceCanvas(textCtx, textCtx.canvas.width, textCtx.canvas.height);
+  const textShapes = traceCanvas(textCtx, textCtx.canvas.width, textCtx.canvas.height, blurR);
   let cx = 0,
     cy = 0;
   if (textShapes.length) {
@@ -525,7 +538,7 @@ export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResu
     const mc = newFrame(W, H);
     drawIconOn(mc, icon, "main", iconX, iconTop, iconSizePx, 0);
     carveText(mc);
-    const mShapes = traceCanvas(mc, mc.canvas.width, mc.canvas.height);
+    const mShapes = traceCanvas(mc, mc.canvas.width, mc.canvas.height, blurR);
     if (mShapes.length) {
       const geo = extrudeLayer(mShapes, spec.thickness, k, bevelMM);
       geo.translate(-cx, -cy, textBackZ);
@@ -535,7 +548,7 @@ export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResu
       const ac = newFrame(W, H);
       drawIconOn(ac, icon, "accent", iconX, iconTop, iconSizePx, 0);
       carveText(ac);
-      const aShapes = traceCanvas(ac, ac.canvas.width, ac.canvas.height);
+      const aShapes = traceCanvas(ac, ac.canvas.width, ac.canvas.height, blurR);
       if (aShapes.length) {
         // raise the accent slightly so it reads as an inlay on top of the main color
         const geo = extrudeLayer(aShapes, spec.thickness, k, bevelMM);
@@ -550,7 +563,7 @@ export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResu
     const sc = newFrame(W, H);
     drawTextOn(sc, spec, fontPx, originX, originY, strokeExpandPx);
     if (icon) drawIconOn(sc, icon, "all", iconX, iconTop, iconSizePx, strokeExpandPx);
-    const sShapes = traceCanvas(sc, sc.canvas.width, sc.canvas.height);
+    const sShapes = traceCanvas(sc, sc.canvas.width, sc.canvas.height, blurR);
     if (sShapes.length) {
       const geo = extrudeLayer(sShapes, strokeHmm, k, bevelMM);
       geo.translate(-cx, -cy, strokeBackZ);
@@ -563,7 +576,7 @@ export async function buildNameplate(spec: NameplateSpec): Promise<NameplateResu
     const bc = newFrame(W, H);
     drawTextOn(bc, spec, fontPx, originX, originY, baseExpandPx);
     if (icon) drawIconOn(bc, icon, "all", iconX, iconTop, iconSizePx, baseExpandPx);
-    const bShapes = traceCanvas(bc, bc.canvas.width, bc.canvas.height);
+    const bShapes = traceCanvas(bc, bc.canvas.width, bc.canvas.height, blurR);
     if (bShapes.length) {
       const geo = extrudeLayer(bShapes, baseT, k, 0);
       geo.translate(-cx, -cy, 0);
