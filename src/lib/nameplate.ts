@@ -336,14 +336,16 @@ function newFrame(W: number, H: number): CanvasRenderingContext2D {
   return ctx;
 }
 
-// Paint the text black, optionally grown outward by `expandPx` (half line width).
+// Paint the text, optionally grown outward by `expandPx` (half line width).
+// Defaults to black for tracing; the thumbnail passes real colors.
 function drawTextOn(
   ctx: CanvasRenderingContext2D,
   spec: NameplateSpec,
   fontPx: number,
   originX: number,
   originY: number,
-  expandPx: number
+  expandPx: number,
+  color = "#000000"
 ) {
   ctx.font = fontString(spec, fontPx);
   ctx.letterSpacing = `${spec.letterSpacing}px`;
@@ -351,16 +353,16 @@ function drawTextOn(
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   if (expandPx > 0) {
-    ctx.strokeStyle = "#000000";
+    ctx.strokeStyle = color;
     ctx.lineWidth = expandPx * 2;
     ctx.strokeText(spec.text, originX, originY);
   }
-  ctx.fillStyle = "#000000";
+  ctx.fillStyle = color;
   ctx.fillText(spec.text, originX, originY);
 }
 
-// Paint an icon part black inside a [boxX,boxY] sizePx square. `growPx` enlarges
-// the box outward to approximate an outline halo for the stroke/base layers.
+// Paint an icon part inside a [boxX,boxY] sizePx square. `growPx` enlarges the
+// box outward to approximate an outline halo for the stroke/base layers.
 function drawIconOn(
   ctx: CanvasRenderingContext2D,
   icon: Exclude<IconName, "none">,
@@ -368,11 +370,12 @@ function drawIconOn(
   boxX: number,
   boxY: number,
   sizePx: number,
-  growPx: number
+  growPx: number,
+  color = "#000000"
 ) {
   const sz = sizePx + 2 * growPx;
   ctx.save();
-  ctx.fillStyle = "#000000";
+  ctx.fillStyle = color;
   ctx.translate(boxX - growPx, boxY - growPx);
   ctx.scale(sz / 100, sz / 100);
   ICON_DRAW[icon](ctx, part);
@@ -647,6 +650,154 @@ export async function buildNameplate(
   group.updateMatrixWorld(true);
 
   return { group, sizeMM: { w: size.x, h: size.y, d: size.z } };
+}
+
+function roundRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+) {
+  const rr = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}
+
+/** A flat top-view colored thumbnail (PNG data URL) of the nameplate — light
+ *  enough to show many at once on the shop board (no WebGL), and it matches how
+ *  the printed piece lies flat so staff can grab the right one. */
+export async function nameplateThumbnail(spec: NameplateSpec): Promise<string> {
+  await ensureFont(spec);
+  const fontPx = 110;
+  const mi = measureTextPx(spec, fontPx);
+  const textH = mi.ascent + mi.descent;
+  const pxPerMM = textH / Math.max(1, spec.size);
+
+  const icon = spec.icon && spec.icon !== "none" ? spec.icon : null;
+  const iconHasAccent = !!(icon && NAMEPLATE_ICONS.find((i) => i.name === icon)?.accent);
+  const iconSize = icon ? textH * (spec.iconScale ?? 1.2) : 0;
+  const iconGap = icon ? textH * 0.18 : 0;
+  const iconSide = spec.iconPos === "right" ? "right" : "left";
+  const hasStroke = !!spec.stroke && (spec.strokeWidth ?? 0) > 0;
+  const strokeW = hasStroke ? (spec.strokeWidth as number) * pxPerMM : 0;
+
+  // working space: text top-left = (0,0), y-down (canvas)
+  const iconX =
+    (iconSide === "left" ? -(iconGap + iconSize) : mi.textW + iconGap) +
+    (spec.iconOffsetX ?? 0) * pxPerMM;
+  const iconY = (textH - iconSize) / 2 - (spec.iconOffsetY ?? 0) * pxPerMM;
+
+  let minX = 0;
+  let minY = 0;
+  let maxX = mi.textW;
+  let maxY = textH;
+  if (icon) {
+    minX = Math.min(minX, iconX);
+    minY = Math.min(minY, iconY);
+    maxX = Math.max(maxX, iconX + iconSize);
+    maxY = Math.max(maxY, iconY + iconSize);
+  }
+
+  const basePad = Math.max(textH * 0.34, strokeW + 6, 10);
+  const bx0 = minX - basePad;
+  const by0 = minY - basePad;
+  const bx1 = maxX + basePad;
+  const by1 = maxY + basePad;
+
+  // ring (top-view annulus)
+  const ringOn = !!spec.ring && spec.ring !== "none";
+  const ringR = ringOn ? Math.max(5, (spec.ringDiameter ?? 12) / 2) * pxPerMM : 0;
+  const ringBar = ringOn ? Math.max(2, ((spec.ringThickness ?? 3.5) / 2) * pxPerMM) : 0;
+  let rcx = 0;
+  let rcy = 0;
+  if (ringOn) {
+    if (spec.ring === "left") {
+      rcx = bx0 - ringR * 0.7;
+      rcy = (by0 + by1) / 2;
+    } else if (spec.ring === "right") {
+      rcx = bx1 + ringR * 0.7;
+      rcy = (by0 + by1) / 2;
+    } else {
+      rcx = (bx0 + bx1) / 2;
+      rcy = by0 - ringR * 0.7;
+    }
+    rcx += (spec.ringOffsetX ?? 0) * pxPerMM;
+    rcy -= (spec.ringOffsetY ?? 0) * pxPerMM;
+  }
+
+  let loX = bx0;
+  let loY = by0;
+  let hiX = bx1;
+  let hiY = by1;
+  if (ringOn) {
+    loX = Math.min(loX, rcx - ringR);
+    loY = Math.min(loY, rcy - ringR);
+    hiX = Math.max(hiX, rcx + ringR);
+    hiY = Math.max(hiY, rcy + ringR);
+  }
+
+  const pad = 6;
+  const W = Math.ceil(hiX - loX + pad * 2);
+  const H = Math.ceil(hiY - loY + pad * 2);
+  const dx = pad - loX;
+  const dy = pad - loY;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+
+  const baseColor = spec.baseColor ?? "#e5e7eb";
+  const tX = dx;
+  const tY = dy + mi.ascent;
+  const iX = iconX + dx;
+  const iY = iconY + dy;
+
+  // keyring (under the plate)
+  if (ringOn) {
+    ctx.lineWidth = ringBar * 2;
+    ctx.strokeStyle = baseColor;
+    ctx.beginPath();
+    ctx.arc(rcx + dx, rcy + dy, Math.max(1, ringR - ringBar), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // base layer
+  if (spec.edge === "contour") {
+    drawTextOn(ctx, spec, fontPx, tX, tY, basePad, baseColor);
+    if (icon) drawIconOn(ctx, icon, "all", iX, iY, iconSize, basePad, baseColor);
+  } else {
+    const r = spec.edge === "round" ? Math.min(bx1 - bx0, by1 - by0) * 0.18 : 3;
+    ctx.fillStyle = baseColor;
+    roundRectPath(ctx, bx0 + dx, by0 + dy, bx1 - bx0, by1 - by0, r);
+    ctx.fill();
+  }
+
+  // stroke layer
+  if (hasStroke) {
+    const sc = spec.strokeColor ?? "#111827";
+    drawTextOn(ctx, spec, fontPx, tX, tY, strokeW, sc);
+    if (icon) drawIconOn(ctx, icon, "all", iX, iY, iconSize, strokeW, sc);
+  }
+
+  // icon
+  if (icon) {
+    drawIconOn(ctx, icon, "main", iX, iY, iconSize, 0, spec.iconColor ?? "#ef4444");
+    if (iconHasAccent)
+      drawIconOn(ctx, icon, "accent", iX, iY, iconSize, 0, spec.iconAccentColor ?? "#fde047");
+  }
+
+  // text (front)
+  drawTextOn(ctx, spec, fontPx, tX, tY, 0, spec.color);
+
+  return canvas.toDataURL("image/png");
 }
 
 /** Export a built nameplate group to a binary STL Blob. */

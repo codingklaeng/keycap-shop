@@ -15,6 +15,7 @@ import { announceQueue, primeAudio } from "@/lib/announce";
 import { VoiceSettingsPanel } from "@/components/VoiceSettingsPanel";
 import { DownloadStlButton } from "@/components/DownloadStlButton";
 import { NameplateEditorModal } from "@/components/NameplateEditorModal";
+import { NameplateThumb } from "@/components/NameplateThumb";
 import type { NameplateSpec } from "@/lib/nameplate";
 
 type BoardLetter = {
@@ -370,8 +371,11 @@ function OrderCard({
       </div>
 
       {isNameplate ? (
-        /* Nameplate: show text + download the STL to 3D-print */
+        /* Nameplate: flat preview + text + download the STL to 3D-print */
         <div className="mt-3 space-y-2">
+          {np && (
+            <NameplateThumb spec={np.spec} className="max-h-28 w-auto object-contain" />
+          )}
           <div className="text-lg font-bold" style={{ fontFamily: np?.spec.font }}>
             {np?.text ?? order.text}
           </div>
