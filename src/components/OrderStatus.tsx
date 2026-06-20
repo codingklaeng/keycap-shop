@@ -6,6 +6,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { formatBaht } from "@/lib/price";
 import { ORDER_STATUS_LABEL, type OrderDetail, type OrderStatus as Status } from "@/lib/types";
 import { saveLastOrder } from "@/components/TrackOrderButton";
+import { OrderPreview } from "@/components/OrderPreview";
 
 const FLOW: Status[] = ["pending", "in_progress", "ready", "picked_up"];
 
@@ -71,6 +72,11 @@ export function OrderStatus({ id }: { id: string }) {
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 py-8">
+      {/* product preview — visual reference to compare when collecting */}
+      <div className="mb-6 overflow-hidden rounded-2xl border border-border bg-card">
+        <OrderPreview order={order} />
+      </div>
+
       {/* queue + status */}
       <div
         className={`rounded-2xl border p-6 text-center ${
