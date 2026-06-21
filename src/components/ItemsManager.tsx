@@ -669,6 +669,18 @@ function PendantsTab({ pendants, onDone }: { pendants: Pendant[]; onDone: () => 
 
 /* ---------- Keycap colors + stock matrix ---------- */
 
+// One-click Thai/Latin character sets for stocking keycaps.
+const QUICK_SETS: { label: string; chars: string }[] = [
+  { label: "พยัญชนะ ก–ฮ", chars: "กขฃคฅฆงจฉชซฌญฎฏฐฑฒณดตถทธนบปผฝพฟภมยรลวศษสหฬอฮฤฦ" },
+  { label: "สระเต็ม (เ แ โ า ำ…)", chars: "ะาำเแโใไๅ" },
+  { label: "สระบน/วรรณยุกต์ (ก้อนเสริม)", chars: "ัิีึื็์ํ่้๊๋" },
+  { label: "สระล่าง (ก้อนเสริม)", chars: "ฺุู" },
+  { label: "เลขไทย ๐–๙", chars: "๐๑๒๓๔๕๖๗๘๙" },
+  { label: "ฯ ๆ ฿", chars: "ฯๆ฿" },
+  { label: "A–Z", chars: "ABCDEFGHIJKLMNOPQRSTUVWXYZ" },
+  { label: "0–9", chars: "0123456789" },
+];
+
 function KeycapsTab({
   colors,
   stock,
@@ -709,6 +721,13 @@ function KeycapsTab({
     if (list.length === 0) return;
     await addKeycapChars(list);
     setNewChars("");
+    onDone();
+  }
+
+  async function quickAdd(str: string) {
+    const list = Array.from(new Set(Array.from(str))).filter((c) => c.trim());
+    if (list.length === 0) return;
+    await addKeycapChars(list);
     onDone();
   }
 
@@ -792,8 +811,21 @@ function KeycapsTab({
             />
             <button onClick={addChars} className={btnAdd}>เพิ่มตัวอักษร</button>
           </div>
-          <p className="mt-1 text-xs text-muted">
-            เพิ่มแล้วช่องสต็อกจะเริ่มที่ 0 — แก้ตัวเลขในตารางแล้วระบบบันทึกอัตโนมัติ
+          <p className="mt-2 mb-1 text-xs font-medium text-muted">เพิ่มทั้งชุดในคลิกเดียว:</p>
+          <div className="flex flex-wrap gap-2">
+            {QUICK_SETS.map((q) => (
+              <button
+                key={q.label}
+                onClick={() => quickAdd(q.chars)}
+                title={q.chars}
+                className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground transition hover:border-primary"
+              >
+                {q.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-muted">
+            เพิ่มแล้วช่องสต็อกจะเริ่มที่ 0 — แก้ตัวเลขในตารางแล้วระบบบันทึกอัตโนมัติ · เครื่องหมายเดี่ยวจะแสดงเป็น ◌ + เครื่องหมาย
           </p>
         </Card>
 
