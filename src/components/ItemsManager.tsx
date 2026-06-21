@@ -19,6 +19,7 @@ import {
   setKeycapStock,
   addKeycapChars,
   removeKeycapChar,
+  bulkSetKeycapStock,
 } from "@/lib/items-actions";
 import type {
   BaseColor,
@@ -731,6 +732,44 @@ function PendantsTab({ pendants, onDone }: { pendants: Pendant[]; onDone: () => 
 
 /* ---------- Keycap colors + stock matrix ---------- */
 
+function csvEscape(s: string): string {
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+// Minimal quote-aware CSV parser (handles "..,.." fields and CRLF/LF).
+function parseCsv(text: string): string[][] {
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1); // strip BOM
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQ) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else inQ = false;
+      } else field += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === ",") {
+      row.push(field);
+      field = "";
+    } else if (ch === "\n") {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+    } else if (ch !== "\r") field += ch;
+  }
+  if (field !== "" || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+
 // One-click Thai/Latin character sets for stocking keycaps.
 const QUICK_SETS: { label: string; chars: string }[] = [
   { label: "พยัญชนะ ก–ฮ", chars: "กขฃคฅฆงจฉชซฌญฎฏฐฑฒณดตถทธนบปผฝพฟภมยรลวศษสหฬอฮฤฦ" },
@@ -757,6 +796,56 @@ function KeycapsTab({
   const chars = Array.from(new Set(stock.map((s) => s.char))).sort();
   const stockMap = new Map(stock.map((s) => [`${s.char}|${s.color_id}`, s.stock]));
   const [newChars, setNewChars] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function exportStock() {
+    const header = ["char", ...colors.map((c) => c.name)];
+    const lines = [header.map(csvEscape).join(",")];
+    for (const ch of chars) {
+      const row = [ch, ...colors.map((c) => String(stockMap.get(`${ch}|${c.id}`) ?? 0))];
+      lines.push(row.map(csvEscape).join(","));
+    }
+    const csv = "﻿" + lines.join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `keycap-stock-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function importStock(file: File) {
+    const grid = parseCsv(await file.text());
+    if (grid.length < 2) {
+      alert("ไฟล์ว่างหรือไม่มีข้อมูล");
+      return;
+    }
+    const head = grid[0];
+    // column index -> color id (match header name to a color; col 0 is the char)
+    const colId = head.map((h, i) =>
+      i === 0 ? null : colors.find((c) => c.name.trim().toLowerCase() === h.trim().toLowerCase())?.id ?? null
+    );
+    if (colId.every((x) => x === null)) {
+      alert("หัวคอลัมน์ไม่ตรงกับชื่อสีที่มี — ใช้ไฟล์ที่ส่งออกจากปุ่มนี้");
+      return;
+    }
+    const rows: { char: string; color_id: string; stock: number }[] = [];
+    for (let r = 1; r < grid.length; r++) {
+      const cells = grid[r];
+      const ch = (cells[0] ?? "").trim();
+      if (!ch) continue;
+      for (let j = 1; j < cells.length; j++) {
+        const cid = colId[j];
+        if (!cid) continue;
+        const n = parseInt(cells[j], 10);
+        rows.push({ char: ch, color_id: cid, stock: Number.isNaN(n) ? 0 : n });
+      }
+    }
+    const res = await bulkSetKeycapStock(rows);
+    onDone();
+    alert(`นำเข้าสำเร็จ ${res.saved} ช่องสต็อก`);
+  }
 
   async function saveAddon(fd: FormData) {
     await saveKeycapConfig({ addon_price: num(fd, "addon_price") });
@@ -862,7 +951,38 @@ function KeycapsTab({
       </div>
 
       <div className="space-y-3">
-        <h2 className="font-semibold">สต็อกแยกตัวอักษร × สี</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold">สต็อกแยกตัวอักษร × สี</h2>
+          <div className="flex gap-2">
+            <button
+              onClick={exportStock}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground hover:border-primary"
+            >
+              ⬇️ ส่งออก Excel (CSV)
+            </button>
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm font-medium text-foreground hover:border-primary"
+            >
+              ⬆️ นำเข้า
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) importStock(f);
+                e.target.value = "";
+              }}
+            />
+          </div>
+        </div>
+        <p className="text-xs text-muted">
+          ส่งออกตารางสต็อกเป็นไฟล์ (แถว = ตัวอักษร, คอลัมน์ = สี) แก้ใน Excel แล้วนำเข้ากลับ —
+          หัวคอลัมน์ต้องเป็นชื่อสีตามที่ตั้งไว้ · ตัวอักษรใหม่ในไฟล์จะถูกเพิ่มให้
+        </p>
         <Card>
           <div className="flex flex-wrap items-center gap-2">
             <input

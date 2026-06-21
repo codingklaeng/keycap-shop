@@ -259,6 +259,27 @@ export async function setKeycapStock(
   if (error) throw new Error(error.message);
 }
 
+// Bulk upsert keycap stock (used by the Excel/CSV import). Creates rows for new
+// characters too. Each row is (char, color_id, stock).
+export async function bulkSetKeycapStock(
+  rows: { char: string; color_id: string; stock: number }[]
+) {
+  const sb = await guard();
+  const clean = rows
+    .filter((r) => r.char && r.color_id)
+    .map((r) => ({
+      char: r.char,
+      color_id: r.color_id,
+      stock: Math.max(0, Math.floor(Number(r.stock) || 0)),
+    }));
+  if (clean.length === 0) return { saved: 0 };
+  const { error } = await sb
+    .from("keycap_stock")
+    .upsert(clean, { onConflict: "char,color_id" });
+  if (error) throw new Error(error.message);
+  return { saved: clean.length };
+}
+
 // Add one or more characters: creates a stock row (default 0) for each keycap color.
 export async function addKeycapChars(chars: string[]) {
   const sb = await guard();
