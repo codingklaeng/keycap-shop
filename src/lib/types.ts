@@ -138,6 +138,14 @@ export type OrderDetail = {
   }[];
 };
 
+export type NameplateColor = {
+  id: string;
+  name: string;
+  swatch: string;
+  sort_order: number;
+  active: boolean;
+};
+
 export type Catalog = {
   baseTypes: BaseType[];
   baseSizes: BaseSize[];

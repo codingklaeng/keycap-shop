@@ -7,6 +7,7 @@ import type {
   Catalog,
   KeycapColor,
   KeycapStock,
+  NameplateColor,
   Pendant,
   SocialPlatform,
 } from "@/lib/types";
@@ -32,6 +33,17 @@ export async function getNameplateConfig(): Promise<NameplateConfig | null> {
     .eq("id", 1)
     .maybeSingle();
   return (data as NameplateConfig) ?? null;
+}
+
+// The filament colors the shop currently offers for 3D nameplates (active only).
+export async function getNameplateColors(): Promise<NameplateColor[]> {
+  const sb = createBrowserClient();
+  const { data } = await sb
+    .from("nameplate_colors")
+    .select("id,name,swatch,sort_order,active")
+    .eq("active", true)
+    .order("sort_order");
+  return (data ?? []) as NameplateColor[];
 }
 
 // Active social platforms for the NFC keychain ordering page (in stock).

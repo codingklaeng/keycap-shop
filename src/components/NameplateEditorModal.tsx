@@ -6,7 +6,9 @@ import * as THREE from "three";
 import { buildNameplate, type NameplateSpec } from "@/lib/nameplate";
 import { NameplateControls } from "@/components/NameplateControls";
 import { saveNameplateSpec } from "@/lib/admin-actions";
+import { getNameplateColors } from "@/lib/catalog";
 import { DownloadStlButton } from "@/components/DownloadStlButton";
+import type { NameplateColor } from "@/lib/types";
 
 const NameplateCanvas = dynamic(
   () => import("@/components/NameplateCanvas").then((m) => m.NameplateCanvas),
@@ -41,6 +43,7 @@ export function NameplateEditorModal({
   onSaved: () => void;
 }) {
   const [spec, setSpec] = useState<NameplateSpec>(initialSpec);
+  const [colors, setColors] = useState<NameplateColor[]>([]);
   const [group, setGroup] = useState<THREE.Group | null>(null);
   const [size, setSize] = useState({ w: 40, h: 20, d: 7 });
   const [saving, setSaving] = useState(false);
@@ -50,6 +53,10 @@ export function NameplateEditorModal({
   function set<K extends keyof NameplateSpec>(k: K, v: NameplateSpec[K]) {
     setSpec((s) => ({ ...s, [k]: v }));
   }
+
+  useEffect(() => {
+    getNameplateColors().then(setColors).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -111,7 +118,7 @@ export function NameplateEditorModal({
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4">
-          <NameplateControls spec={spec} set={set} />
+          <NameplateControls spec={spec} set={set} colors={colors} />
           {error && (
             <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
           )}

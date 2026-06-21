@@ -145,6 +145,18 @@ export async function saveSocialPlatform(input: SocialPlatformInput) {
   if (error) throw new Error(error.message);
 }
 
+export async function saveNameplateColor(input: {
+  id?: string;
+  name: string;
+  swatch: string;
+  sort_order?: number;
+  active?: boolean;
+}) {
+  const sb = await guard();
+  const { error } = await sb.from("nameplate_colors").upsert(input);
+  if (error) throw new Error(error.message);
+}
+
 export async function saveNameplateConfig(input: {
   base_price: number;
   price_per_char: number;
@@ -171,7 +183,8 @@ export async function deleteItem(
     | "base_variants"
     | "keycap_colors"
     | "pendants"
-    | "social_platforms",
+    | "social_platforms"
+    | "nameplate_colors",
   id: string
 ) {
   const sb = await guard();

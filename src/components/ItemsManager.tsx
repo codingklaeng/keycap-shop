@@ -12,6 +12,7 @@ import {
   savePendant,
   saveSocialPlatform,
   saveNameplateConfig,
+  saveNameplateColor,
   deleteItem,
   setKeycapStock,
   addKeycapChars,
@@ -24,6 +25,7 @@ import type {
   BaseVariant,
   KeycapColor,
   KeycapStock,
+  NameplateColor,
   Pendant,
   SocialPlatform,
 } from "@/lib/types";
@@ -36,7 +38,8 @@ type Tab =
   | "keycaps"
   | "pendants"
   | "nfc"
-  | "nameplate";
+  | "nameplate"
+  | "filament";
 const TABS: { key: Tab; label: string }[] = [
   { key: "types", label: "แบบฐาน" },
   { key: "sizes", label: "ขนาดฐาน" },
@@ -46,6 +49,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "pendants", label: "ตัวห้อย" },
   { key: "nfc", label: "NFC (social)" },
   { key: "nameplate", label: "ป้ายชื่อ 3D" },
+  { key: "filament", label: "สีฟิลาเมนต์ (ป้ายชื่อ)" },
 ];
 
 export function ItemsManager(props: {
@@ -67,6 +71,7 @@ export function ItemsManager(props: {
     min_deposit_percent: number;
     active: boolean;
   };
+  nameplateColors: NameplateColor[];
 }) {
   const [tab, setTab] = useState<Tab>("types");
   const router = useRouter();
@@ -121,6 +126,9 @@ export function ItemsManager(props: {
       )}
       {tab === "nameplate" && (
         <NameplateTab config={props.nameplateConfig} onDone={refresh} />
+      )}
+      {tab === "filament" && (
+        <FilamentColorsTab colors={props.nameplateColors} onDone={refresh} />
       )}
     </div>
   );
@@ -448,6 +456,61 @@ function BaseColorsTab({ colors, onDone }: { colors: BaseColor[]; onDone: () => 
             <div className="flex gap-2">
               <button className={btnSave}>บันทึก</button>
               <DeleteBtn onClick={async () => { await deleteItem("base_colors", c.id); onDone(); }} />
+            </div>
+          </form>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- Filament colors for 3D nameplates ---------- */
+
+function FilamentColorsTab({
+  colors,
+  onDone,
+}: {
+  colors: NameplateColor[];
+  onDone: () => void;
+}) {
+  async function save(fd: FormData, id?: string) {
+    await saveNameplateColor({
+      id,
+      name: String(fd.get("name")),
+      swatch: String(fd.get("swatch")),
+      sort_order: num(fd, "sort_order"),
+      active: fd.get("active") === "on",
+    });
+    onDone();
+  }
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted">
+        สีที่ลูกค้าเลือกได้สำหรับป้ายชื่อ 3D — ใส่ตามไส้ filament ที่ร้านมีตอนนี้ ปิด
+        “เปิดใช้” เมื่อไส้สีไหนหมด ลูกค้าจะเลือกได้เฉพาะสีที่เปิดอยู่
+      </p>
+      <Card>
+        <p className="mb-2 font-semibold">เพิ่มสีใหม่</p>
+        <form action={(fd) => save(fd)} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <input name="name" placeholder="ชื่อสี เช่น แดง" required className={inp} />
+          <input name="swatch" type="color" defaultValue="#cccccc" className="h-10 w-full rounded-lg border border-border" />
+          <input type="hidden" name="sort_order" value={colors.length + 1} />
+          <input type="hidden" name="active" value="on" />
+          <button className={btnAdd}>เพิ่ม</button>
+        </form>
+      </Card>
+      {colors.map((c) => (
+        <Card key={c.id}>
+          <form action={(fd) => save(fd, c.id)} className="grid grid-cols-2 items-center gap-2 sm:grid-cols-4">
+            <input name="name" defaultValue={c.name} className={inp} />
+            <input name="swatch" type="color" defaultValue={c.swatch} className="h-10 w-full rounded-lg border border-border" />
+            <input type="hidden" name="sort_order" defaultValue={c.sort_order} />
+            <label className="flex items-center gap-1 text-sm">
+              <input type="checkbox" name="active" defaultChecked={c.active} /> เปิดใช้
+            </label>
+            <div className="flex gap-2">
+              <button className={btnSave}>บันทึก</button>
+              <DeleteBtn onClick={async () => { await deleteItem("nameplate_colors", c.id); onDone(); }} />
             </div>
           </form>
         </Card>

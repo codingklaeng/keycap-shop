@@ -15,7 +15,8 @@ import {
   Field,
   inp,
 } from "@/components/NameplateControls";
-import type { NameplateConfig } from "@/lib/catalog";
+import { getNameplateColors, type NameplateConfig } from "@/lib/catalog";
+import type { NameplateColor } from "@/lib/types";
 
 const NameplateCanvas = dynamic(
   () => import("@/components/NameplateCanvas").then((m) => m.NameplateCanvas),
@@ -67,6 +68,7 @@ function disposeGroup(g: THREE.Object3D | null) {
 export function NameplateWizard({ config }: { config: NameplateConfig }) {
   const router = useRouter();
   const [spec, setSpec] = useState<NameplateSpec>(DEFAULT);
+  const [colors, setColors] = useState<NameplateColor[]>([]);
   const [note, setNote] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerContact, setCustomerContact] = useState("");
@@ -96,6 +98,26 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
   function set<K extends keyof NameplateSpec>(k: K, v: NameplateSpec[K]) {
     setSpec((s) => ({ ...s, [k]: v }));
   }
+
+  // load the shop's filament colors and snap any default that isn't available
+  // onto a real swatch so the customer only ever ends up with offered colors
+  useEffect(() => {
+    getNameplateColors().then((list) => {
+      setColors(list);
+      if (list.length === 0) return;
+      const palette = list.map((c) => c.swatch.toLowerCase());
+      const pick = (v?: string) =>
+        v && palette.includes(v.toLowerCase()) ? v : list[0].swatch;
+      setSpec((s) => ({
+        ...s,
+        color: pick(s.color),
+        baseColor: pick(s.baseColor),
+        strokeColor: pick(s.strokeColor),
+        iconColor: pick(s.iconColor),
+        iconAccentColor: pick(s.iconAccentColor),
+      }));
+    });
+  }, []);
 
   // rebuild the 3D model (debounced) whenever the spec changes
   useEffect(() => {
@@ -182,7 +204,7 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
       </header>
 
       <main className="mx-auto w-full max-w-lg flex-1 space-y-5 px-4 py-5 pb-28">
-        <NameplateControls spec={spec} set={set} />
+        <NameplateControls spec={spec} set={set} colors={colors} />
 
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
           <Field label="ชื่อผู้รับ (สำหรับเรียกรับของ)">

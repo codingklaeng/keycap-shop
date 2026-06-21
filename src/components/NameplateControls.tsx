@@ -9,14 +9,56 @@ import {
 
 type SetSpec = <K extends keyof NameplateSpec>(k: K, v: NameplateSpec[K]) => void;
 
+export type Swatch = { name: string; swatch: string };
+
+const sameColor = (a?: string, b?: string) =>
+  (a ?? "").toLowerCase() === (b ?? "").toLowerCase();
+
+// A picker limited to the shop's available filament colors.
+function SwatchPicker({
+  colors,
+  value,
+  onChange,
+}: {
+  colors: Swatch[];
+  value?: string;
+  onChange: (hex: string) => void;
+}) {
+  if (colors.length === 0) {
+    return <p className="text-xs text-muted">ยังไม่มีสีให้เลือก (แอดมินเพิ่มได้ที่ “สีฟิลาเมนต์”)</p>;
+  }
+  return (
+    <div className="flex flex-wrap gap-2">
+      {colors.map((c) => {
+        const active = sameColor(value, c.swatch);
+        return (
+          <button
+            key={c.swatch + c.name}
+            type="button"
+            title={c.name}
+            onClick={() => onChange(c.swatch)}
+            className={`h-9 w-9 rounded-lg border-2 transition ${
+              active ? "border-primary ring-2 ring-primary/40" : "border-border"
+            }`}
+            style={{ backgroundColor: c.swatch }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 // All of the nameplate design controls, shared by the customer wizard and the
-// admin order editor. The owner provides `spec` and a `set(key, value)` updater.
+// admin order editor. The owner provides `spec`, a `set(key, value)` updater,
+// and the list of filament colors the customer may pick from.
 export function NameplateControls({
   spec,
   set,
+  colors,
 }: {
   spec: NameplateSpec;
   set: SetSpec;
+  colors: Swatch[];
 }) {
   const hasIcon = !!spec.icon && spec.icon !== "none";
   const iconHasAccent =
@@ -132,22 +174,12 @@ export function NameplateControls({
           </div>
         </Field>
         <Field label="สีตัวอักษร">
-          <input
-            type="color"
-            value={spec.color}
-            onChange={(e) => set("color", e.target.value)}
-            className="h-11 w-full rounded-xl border border-border"
-          />
+          <SwatchPicker colors={colors} value={spec.color} onChange={(h) => set("color", h)} />
         </Field>
       </div>
 
       <Field label="สีฐาน">
-        <input
-          type="color"
-          value={spec.baseColor ?? "#e5e7eb"}
-          onChange={(e) => set("baseColor", e.target.value)}
-          className="h-11 w-full rounded-xl border border-border"
-        />
+        <SwatchPicker colors={colors} value={spec.baseColor} onChange={(h) => set("baseColor", h)} />
       </Field>
 
       {/* middle stroke layer */}
@@ -163,12 +195,7 @@ export function NameplateControls({
         {spec.stroke && (
           <>
             <Field label="สีเส้นขอบ">
-              <input
-                type="color"
-                value={spec.strokeColor ?? "#111827"}
-                onChange={(e) => set("strokeColor", e.target.value)}
-                className="h-11 w-full rounded-xl border border-border"
-              />
+              <SwatchPicker colors={colors} value={spec.strokeColor} onChange={(h) => set("strokeColor", h)} />
             </Field>
             <Slider label="ความกว้างเส้นขอบ" unit="มม." min={0.4} max={5} step={0.2}
               value={spec.strokeWidth ?? 1.2} onChange={(v) => set("strokeWidth", v)} />
@@ -208,21 +235,11 @@ export function NameplateControls({
               value={spec.iconScale ?? 1.2} onChange={(v) => set("iconScale", v)} />
             <div className="grid grid-cols-2 gap-3">
               <Field label="สีไอคอน">
-                <input
-                  type="color"
-                  value={spec.iconColor ?? "#ef4444"}
-                  onChange={(e) => set("iconColor", e.target.value)}
-                  className="h-11 w-full rounded-xl border border-border"
-                />
+                <SwatchPicker colors={colors} value={spec.iconColor} onChange={(h) => set("iconColor", h)} />
               </Field>
               {iconHasAccent && (
                 <Field label="สีลายในไอคอน">
-                  <input
-                    type="color"
-                    value={spec.iconAccentColor ?? "#fde047"}
-                    onChange={(e) => set("iconAccentColor", e.target.value)}
-                    className="h-11 w-full rounded-xl border border-border"
-                  />
+                  <SwatchPicker colors={colors} value={spec.iconAccentColor} onChange={(h) => set("iconAccentColor", h)} />
                 </Field>
               )}
             </div>
