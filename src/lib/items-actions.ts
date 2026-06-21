@@ -105,6 +105,49 @@ export async function saveBaseVariant(input: BaseVariantInput) {
   if (error) throw new Error(error.message);
 }
 
+// Create base_variants for every size of a base type at once: price scales with
+// the size's slot count, stock is the same starter value, and any size that
+// already has a variant for this color is skipped.
+export async function addVariantsBatch(input: {
+  base_type_id: string;
+  base_color_id: string;
+  price_first: number; // price for a 1-slot size
+  price_per_extra: number; // added per extra slot
+  stock: number;
+}): Promise<{ added: number; skipped: number }> {
+  const sb = await guard();
+  const { data: sizes } = await sb
+    .from("base_sizes")
+    .select("id,max_chars")
+    .eq("base_type_id", input.base_type_id);
+  if (!sizes || sizes.length === 0) return { added: 0, skipped: 0 };
+
+  const { data: existing } = await sb
+    .from("base_variants")
+    .select("base_size_id")
+    .eq("base_color_id", input.base_color_id);
+  const have = new Set((existing ?? []).map((e) => e.base_size_id));
+
+  const missing = sizes.filter((s) => !have.has(s.id));
+  const rows = missing.map((s) => ({
+    base_size_id: s.id,
+    base_color_id: input.base_color_id,
+    price:
+      Number(input.price_first) +
+      Math.max(0, Number(s.max_chars) - 1) * Number(input.price_per_extra),
+    stock: Math.max(0, Math.floor(input.stock)),
+    sort_order: Number(s.max_chars),
+    active: true,
+  }));
+  if (rows.length > 0) {
+    const { error } = await sb
+      .from("base_variants")
+      .upsert(rows, { onConflict: "base_size_id,base_color_id", ignoreDuplicates: true });
+    if (error) throw new Error(error.message);
+  }
+  return { added: rows.length, skipped: sizes.length - rows.length };
+}
+
 export async function saveKeycapColor(input: KeycapColorInput) {
   const sb = await guard();
   // Insert returns the new row so we can backfill stock rows for every char.

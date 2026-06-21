@@ -8,6 +8,7 @@ import {
   saveBaseSize,
   saveBaseColor,
   saveBaseVariant,
+  addVariantsBatch,
   saveKeycapColor,
   savePendant,
   saveSocialPlatform,
@@ -562,6 +563,20 @@ function VariantsTab({
     });
     onDone();
   }
+  async function batch(fd: FormData) {
+    const res = await addVariantsBatch({
+      base_type_id: String(fd.get("base_type_id")),
+      base_color_id: String(fd.get("base_color_id")),
+      price_first: num(fd, "price_first"),
+      price_per_extra: num(fd, "price_per_extra"),
+      stock: num(fd, "stock"),
+    });
+    onDone();
+    alert(
+      `เพิ่ม ${res.added} รายการ` +
+        (res.skipped > 0 ? ` · ข้ามที่มีอยู่แล้ว ${res.skipped}` : "")
+    );
+  }
   const colorName = (id: string) => colors.find((c) => c.id === id)?.name ?? "-";
   const sizeText = (id: string) => {
     const s = sizes.find((x) => x.id === id);
@@ -576,8 +591,42 @@ function VariantsTab({
       {sizes.length === 0 || colors.length === 0 ? (
         <p className="text-sm text-muted">ต้องมีขนาดฐานและสีฐานอย่างน้อยอย่างละ 1 ก่อน</p>
       ) : (
+        <>
         <Card>
-          <p className="mb-2 font-semibold">เพิ่มการจับคู่ใหม่</p>
+          <p className="mb-2 font-semibold">เพิ่มทุกขนาดทีเดียว (ตามแบบฐาน)</p>
+          <form action={batch} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-3">
+            <label className="text-xs text-muted">แบบฐาน
+              <select name="base_type_id" required className={`${inp} w-full`}>
+                {types.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs text-muted">สีฐาน
+              <select name="base_color_id" required className={`${inp} w-full`}>
+                {colors.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs text-muted">ราคา 1 ช่อง
+              <input name="price_first" type="number" min={0} step="0.5" required className={`${inp} w-full`} />
+            </label>
+            <label className="text-xs text-muted">ราคา +เพิ่ม/ช่อง
+              <input name="price_per_extra" type="number" min={0} step="0.5" defaultValue={0} required className={`${inp} w-full`} />
+            </label>
+            <label className="text-xs text-muted">สต็อกเริ่มต้น
+              <input name="stock" type="number" min={0} defaultValue={0} required className={`${inp} w-full`} />
+            </label>
+            <button className={btnAdd}>เพิ่มทุกขนาด</button>
+          </form>
+          <p className="mt-1 text-xs text-muted">
+            สร้างให้ครบทุกขนาดของแบบฐานที่เลือก · ราคา = ราคา 1 ช่อง + (จำนวนช่อง−1) × ราคาต่อช่อง ·
+            ขนาดที่จับคู่สีนี้ไว้แล้วจะข้ามให้ · สต็อกจริงค่อยมาแก้ทีหลังได้
+          </p>
+        </Card>
+        <Card>
+          <p className="mb-2 font-semibold">เพิ่มการจับคู่ใหม่ (ทีละรายการ)</p>
           <form action={(fd) => save(fd)} className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <select name="base_size_id" required className={inp}>
               {sizes.map((s) => (
@@ -597,6 +646,7 @@ function VariantsTab({
             <button className={btnAdd}>เพิ่ม</button>
           </form>
         </Card>
+        </>
       )}
       {variants.map((v) => (
         <Card key={v.id}>
