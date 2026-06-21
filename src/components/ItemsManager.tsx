@@ -382,14 +382,20 @@ function SizesTab({
       ) : (
         <Card>
           <p className="mb-2 font-semibold">เพิ่มขนาดใหม่</p>
-          <form action={(fd) => save(fd)} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <select name="base_type_id" required className={inp}>
-              {types.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-            <input name="max_chars" type="number" min={1} max={20} placeholder="จำนวนช่อง" required className={inp} />
-            <input name="sort_order" type="number" placeholder="ลำดับ" defaultValue={sizes.length + 1} className={inp} />
+          <form action={(fd) => save(fd)} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-4">
+            <label className="text-xs text-muted">แบบฐาน
+              <select name="base_type_id" required className={`${inp} w-full`}>
+                {types.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs text-muted">จำนวนช่อง (ตัวอักษรเต็มสูงสุด)
+              <input name="max_chars" type="number" min={1} max={20} required className={`${inp} w-full`} />
+            </label>
+            <label className="text-xs text-muted">ลำดับการแสดง
+              <input name="sort_order" type="number" defaultValue={sizes.length + 1} className={`${inp} w-full`} />
+            </label>
             <input type="hidden" name="active" value="on" />
             <button className={btnAdd}>เพิ่ม</button>
           </form>
@@ -397,14 +403,20 @@ function SizesTab({
       )}
       {sizes.map((s) => (
         <Card key={s.id}>
-          <form action={(fd) => save(fd, s.id)} className="grid grid-cols-2 items-center gap-2 sm:grid-cols-5">
-            <select name="base_type_id" defaultValue={s.base_type_id ?? ""} className={inp}>
-              {types.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-            <input name="max_chars" type="number" min={1} max={20} defaultValue={s.max_chars} className={inp} />
-            <input name="sort_order" type="number" defaultValue={s.sort_order} className={inp} />
+          <form action={(fd) => save(fd, s.id)} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-5">
+            <label className="text-xs text-muted">แบบฐาน
+              <select name="base_type_id" defaultValue={s.base_type_id ?? ""} className={`${inp} w-full`}>
+                {types.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs text-muted">จำนวนช่อง
+              <input name="max_chars" type="number" min={1} max={20} defaultValue={s.max_chars} className={`${inp} w-full`} />
+            </label>
+            <label className="text-xs text-muted">ลำดับการแสดง
+              <input name="sort_order" type="number" defaultValue={s.sort_order} className={`${inp} w-full`} />
+            </label>
             <label className="flex items-center gap-1 text-sm">
               <input type="checkbox" name="active" defaultChecked={s.active} /> เปิด
             </label>
