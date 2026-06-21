@@ -60,6 +60,29 @@ export async function saveNameplateSpec(orderId: string, spec: unknown, text: st
   await sb.from("orders").update({ text }).eq("id", orderId);
 }
 
+// Whether the shop is currently taking 3D-nameplate orders.
+export async function getNameplateActive(): Promise<boolean> {
+  if (!(await isAdmin())) throw new Error("unauthorized");
+  const sb = createAdminClient();
+  const { data } = await sb
+    .from("nameplate_config")
+    .select("active")
+    .eq("id", 1)
+    .maybeSingle();
+  return !!data?.active;
+}
+
+// Quick open/close switch for nameplate ordering (e.g. only at weekend markets).
+export async function setNameplateActive(active: boolean) {
+  if (!(await isAdmin())) throw new Error("unauthorized");
+  const sb = createAdminClient();
+  const { error } = await sb
+    .from("nameplate_config")
+    .update({ active })
+    .eq("id", 1);
+  if (error) throw new Error(error.message);
+}
+
 // The minimum-deposit % that must be paid before a nameplate goes into production.
 export async function getDepositPercent(): Promise<number> {
   if (!(await isAdmin())) throw new Error("unauthorized");

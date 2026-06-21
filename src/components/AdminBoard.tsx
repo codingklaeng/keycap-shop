@@ -7,6 +7,8 @@ import {
   getTodayOrders,
   setOrderPaid,
   getDepositPercent,
+  getNameplateActive,
+  setNameplateActive,
 } from "@/lib/admin-actions";
 import { formatBaht } from "@/lib/price";
 import { ORDER_STATUS_LABEL, type OrderStatus } from "@/lib/types";
@@ -94,6 +96,7 @@ export function AdminBoard({ today }: { today: string }) {
   const [soundOn, setSoundOn] = useState(false);
   const [showVoice, setShowVoice] = useState(false);
   const [depositPct, setDepositPct] = useState(0);
+  const [npOpen, setNpOpen] = useState<boolean | null>(null);
   const [editing, setEditing] = useState<BoardOrder | null>(null);
   const announced = useRef<Set<string>>(new Set());
   const seeded = useRef(false);
@@ -103,7 +106,18 @@ export function AdminBoard({ today }: { today: string }) {
       setSoundOn(localStorage.getItem("keycap_sound") === "1");
     } catch {}
     getDepositPercent().then(setDepositPct).catch(() => {});
+    getNameplateActive().then(setNpOpen).catch(() => {});
   }, []);
+
+  async function toggleNameplate() {
+    const next = !npOpen;
+    setNpOpen(next);
+    try {
+      await setNameplateActive(next);
+    } catch {
+      setNpOpen(!next);
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -225,6 +239,35 @@ export function AdminBoard({ today }: { today: string }) {
       </div>
 
       {showVoice && <VoiceSettingsPanel onClose={() => setShowVoice(false)} />}
+
+      {npOpen !== null && (
+        <div
+          className={`mb-4 flex items-center justify-between rounded-xl border px-4 py-3 ${
+            npOpen ? "border-green-300 bg-green-50" : "border-amber-300 bg-amber-50"
+          }`}
+        >
+          <div className="text-sm">
+            <div className="font-semibold">
+              🔤 รับสั่งป้ายชื่อ 3D: {npOpen ? "เปิดอยู่" : "ปิดอยู่"}
+            </div>
+            <div className="text-xs text-muted">
+              {npOpen
+                ? "ลูกค้าสั่งออกแบบป้ายชื่อได้"
+                : "ลูกค้าจะสั่งไม่ได้ (เหมาะตอนไม่ได้เปิดร้าน/ออกตลาด)"}
+            </div>
+          </div>
+          <button
+            onClick={toggleNameplate}
+            className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold ${
+              npOpen
+                ? "border border-border bg-card text-muted"
+                : "bg-primary text-primary-foreground"
+            }`}
+          >
+            {npOpen ? "ปิดรับสั่ง" : "เปิดรับสั่ง"}
+          </button>
+        </div>
+      )}
 
       {active.length === 0 && (
         <p className="rounded-xl border border-border bg-card p-6 text-center text-muted">

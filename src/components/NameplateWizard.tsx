@@ -163,11 +163,12 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
         p_customer_contact: customerContact.trim() || null,
       });
       if (rpcError) {
-        setError(
-          rpcError.message === "CUSTOMER_NAME_REQUIRED"
-            ? "กรุณากรอกชื่อผู้รับ"
-            : "เกิดข้อผิดพลาด กรุณาลองใหม่"
-        );
+        const msg = rpcError.message.includes("CUSTOMER_NAME_REQUIRED")
+          ? "กรุณากรอกชื่อผู้รับ"
+          : rpcError.message.includes("NAMEPLATE_CLOSED")
+            ? "ขณะนี้ปิดรับสั่งป้ายชื่อ 3D ชั่วคราว"
+            : "เกิดข้อผิดพลาด กรุณาลองใหม่";
+        setError(msg);
         setSubmitting(false);
         return;
       }
