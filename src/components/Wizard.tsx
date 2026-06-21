@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -71,6 +71,11 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
   const graphemes = useMemo(() => splitGraphemes(text), [text]);
   // each grapheme is one keycap/slot, split into base + upper/lower add-ons
   const units = useMemo(() => graphemes.map(decomposeCluster), [graphemes]);
+  // Thai keycaps (with stacked vowels/tones) only work laid out horizontally — lock it.
+  const isThai = useMemo(() => /[฀-๿]/.test(text), [text]);
+  useEffect(() => {
+    if (isThai && layout === "vertical") setLayout("horizontal");
+  }, [isThai, layout]);
   const addonTotal = useMemo(
     () => units.reduce((n, u) => n + addonCount(u), 0),
     [units]
@@ -364,15 +369,18 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
                     { v: "horizontal", label: "แนวนอน", demo: "flex-row" },
                     { v: "vertical", label: "แนวตั้ง", demo: "flex-col" },
                   ] as const
-                ).map((o) => (
+                ).map((o) => {
+                  const disabled = isThai && o.v === "vertical";
+                  return (
                   <button
                     key={o.v}
+                    disabled={disabled}
                     onClick={() => setLayout(o.v)}
                     className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition ${
                       layout === o.v
                         ? "border-primary bg-primary/5"
                         : "border-border bg-card hover:border-primary"
-                    }`}
+                    } ${disabled ? "cursor-not-allowed opacity-40 hover:border-border" : ""}`}
                   >
                     <span className={`flex ${o.demo} gap-0.5`}>
                       {["A", "B", "C"].map((c) => (
@@ -386,8 +394,14 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
                     </span>
                     <span className="font-medium">{o.label}</span>
                   </button>
-                ))}
+                  );
+                })}
               </div>
+              {isThai && (
+                <p className="mt-2 text-xs text-muted">
+                  ภาษาไทยรองรับเฉพาะแนวนอน (สระ/วรรณยุกต์ต้องเรียงในแนวเดียวกับพยัญชนะ)
+                </p>
+              )}
             </div>
           </section>
         )}
