@@ -145,6 +145,15 @@ export async function saveSocialPlatform(input: SocialPlatformInput) {
   if (error) throw new Error(error.message);
 }
 
+export async function saveKeycapConfig(input: { addon_price: number }) {
+  const sb = await guard();
+  const { error } = await sb
+    .from("keycap_config")
+    .update(input)
+    .eq("id", 1);
+  if (error) throw new Error(error.message);
+}
+
 export async function saveNameplateColor(input: {
   id?: string;
   name: string;

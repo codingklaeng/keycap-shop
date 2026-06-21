@@ -62,7 +62,7 @@ export async function getActivePlatforms(): Promise<SocialPlatform[]> {
 // Uses the public key; RLS allows read of all rows so we filter active here.
 export async function getActiveCatalog(): Promise<Catalog> {
   const sb = createBrowserClient();
-  const [baseTypes, baseSizes, baseColors, baseVariants, keycapColors, keycapStock, pendants] =
+  const [baseTypes, baseSizes, baseColors, baseVariants, keycapColors, keycapStock, pendants, keycapCfg] =
     await Promise.all([
       sb.from("base_types").select("*").eq("active", true).order("sort_order"),
       sb.from("base_sizes").select("*").eq("active", true).order("sort_order"),
@@ -71,6 +71,7 @@ export async function getActiveCatalog(): Promise<Catalog> {
       sb.from("keycap_colors").select("*").eq("active", true).order("sort_order"),
       sb.from("keycap_stock").select("*").gt("stock", 0),
       sb.from("pendants").select("*").eq("active", true).order("sort_order"),
+      sb.from("keycap_config").select("addon_price").eq("id", 1).maybeSingle(),
     ]);
 
   return {
@@ -81,5 +82,18 @@ export async function getActiveCatalog(): Promise<Catalog> {
     keycapColors: (keycapColors.data ?? []) as KeycapColor[],
     keycapStock: (keycapStock.data ?? []) as KeycapStock[],
     pendants: (pendants.data ?? []) as Pendant[],
+    addonPrice: Number((keycapCfg.data as { addon_price?: number } | null)?.addon_price ?? 0),
   };
+}
+
+export type KeycapConfig = { addon_price: number };
+
+export async function getKeycapConfig(): Promise<KeycapConfig> {
+  const sb = createBrowserClient();
+  const { data } = await sb
+    .from("keycap_config")
+    .select("addon_price")
+    .eq("id", 1)
+    .maybeSingle();
+  return { addon_price: Number((data as KeycapConfig | null)?.addon_price ?? 0) };
 }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { splitGraphemes } from "@/lib/graphemes";
+import { decomposeCluster, addonCount, unitPieceChars, type Unit } from "@/lib/thai";
 import { calcPrice, formatBaht } from "@/lib/price";
 import { saveLastOrder } from "@/components/TrackOrderButton";
 import { KeycapPreview3D } from "@/components/KeycapPreview3D";
@@ -68,6 +69,23 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
   );
 
   const graphemes = useMemo(() => splitGraphemes(text), [text]);
+  // each grapheme is one keycap/slot, split into base + upper/lower add-ons
+  const units = useMemo(() => graphemes.map(decomposeCluster), [graphemes]);
+  const addonTotal = useMemo(
+    () => units.reduce((n, u) => n + addonCount(u), 0),
+    [units]
+  );
+
+  // colors in which a whole unit is makeable (base + every mark all in stock)
+  const colorsForUnit = useMemo(() => {
+    return (u: Unit) => {
+      const pieces = unitPieceChars(u);
+      return catalog.keycapColors.filter((c) =>
+        pieces.every((pc) => availability.get(pc)?.has(c.id))
+      );
+    };
+  }, [catalog.keycapColors, availability]);
+
   const size = catalog.baseSizes.find((s) => s.id === sizeId) ?? null;
   const variant =
     catalog.baseVariants.find(
@@ -88,14 +106,12 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
     letters,
     keycapColors: catalog.keycapColors,
     pendant,
+    addonPrice: catalog.addonPrice,
+    addonCount: addonTotal,
   });
 
   const uniqueUnmakeable = Array.from(
-    new Set(
-      graphemes.filter(
-        (ch) => !availability.has(ch) || availability.get(ch)!.size === 0
-      )
-    )
+    new Set(units.filter((u) => colorsForUnit(u).length === 0).map((u) => u.char))
   );
 
   // live preview letters (resolve colors for the mockup at the top)
@@ -130,11 +146,6 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
       .filter((x) => x.color);
   }, [sizeId, catalog.baseVariants, catalog.baseColors]);
 
-  function colorsForChar(ch: string) {
-    const ids = availability.get(ch) ?? new Set<string>();
-    return catalog.keycapColors.filter((c) => ids.has(c.id));
-  }
-
   // pick the best size for a given text length within the current type:
   // exact slot match first, otherwise the smallest size that still fits.
   function autoSizeId(len: number): string | null {
@@ -157,13 +168,10 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
 
     const next: Record<number, string> = {};
     gs.forEach((ch, i) => {
-      const opts = availability.get(ch);
+      const opts = colorsForUnit(decomposeCluster(ch));
       const current = letterColors[i];
-      if (current && opts?.has(current)) next[i] = current;
-      else if (opts && opts.size > 0) {
-        const first = catalog.keycapColors.find((c) => opts.has(c.id));
-        if (first) next[i] = first.id;
-      }
+      if (current && opts.some((c) => c.id === current)) next[i] = current;
+      else if (opts.length > 0) next[i] = opts[0].id;
     });
     setLetterColors(next);
 
@@ -210,11 +218,17 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
         p_base_variant_id: variant.id,
         p_pendant_id: pendant?.id ?? null,
         p_layout: layout,
-        p_letters: letters.map((l) => ({
-          position: l.position,
-          char: l.char,
-          keycap_color_id: l.keycap_color_id,
-        })),
+        p_letters: letters.map((l) => {
+          const u = units[l.position];
+          return {
+            position: l.position,
+            char: u.char,
+            base: u.base,
+            upper: u.upper,
+            lower: u.lower,
+            keycap_color_id: l.keycap_color_id,
+          };
+        }),
         p_note: note.trim() || null,
         p_customer_name: customerName.trim(),
         p_customer_contact: customerContact.trim() || null,
@@ -279,7 +293,8 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
                 className="w-full rounded-xl border border-border bg-card px-4 py-3 text-2xl font-bold tracking-widest outline-none focus:border-primary"
               />
               <p className="mt-2 text-sm text-muted">
-                จำนวนตัวอักษร: {graphemes.length}
+                จำนวนช่อง (ตัวเต็ม): {units.length}
+                {addonTotal > 0 ? ` · ก้อนเสริม (สระ/วรรณยุกต์): ${addonTotal}` : ""}
               </p>
               {uniqueUnmakeable.length > 0 && (
                 <p className="mt-1 text-sm text-red-600">
@@ -423,7 +438,7 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
             </label>
             <div className="space-y-3">
               {letters.map((l) => {
-                const opts = colorsForChar(l.char);
+                const opts = colorsForUnit(units[l.position]);
                 return (
                   <div
                     key={l.position}

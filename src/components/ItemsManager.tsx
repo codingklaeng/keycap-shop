@@ -13,6 +13,7 @@ import {
   saveSocialPlatform,
   saveNameplateConfig,
   saveNameplateColor,
+  saveKeycapConfig,
   deleteItem,
   setKeycapStock,
   addKeycapChars,
@@ -72,6 +73,7 @@ export function ItemsManager(props: {
     active: boolean;
   };
   nameplateColors: NameplateColor[];
+  keycapAddonPrice: number;
 }) {
   const [tab, setTab] = useState<Tab>("types");
   const router = useRouter();
@@ -115,6 +117,7 @@ export function ItemsManager(props: {
         <KeycapsTab
           colors={props.keycapColors}
           stock={props.keycapStock}
+          addonPrice={props.keycapAddonPrice}
           onDone={refresh}
         />
       )}
@@ -669,15 +672,22 @@ function PendantsTab({ pendants, onDone }: { pendants: Pendant[]; onDone: () => 
 function KeycapsTab({
   colors,
   stock,
+  addonPrice,
   onDone,
 }: {
   colors: KeycapColor[];
   stock: KeycapStock[];
+  addonPrice: number;
   onDone: () => void;
 }) {
   const chars = Array.from(new Set(stock.map((s) => s.char))).sort();
   const stockMap = new Map(stock.map((s) => [`${s.char}|${s.color_id}`, s.stock]));
   const [newChars, setNewChars] = useState("");
+
+  async function saveAddon(fd: FormData) {
+    await saveKeycapConfig({ addon_price: num(fd, "addon_price") });
+    onDone();
+  }
 
   async function saveColor(fd: FormData, id?: string) {
     await saveKeycapColor({
@@ -704,6 +714,22 @@ function KeycapsTab({
 
   return (
     <div className="space-y-6">
+      <div className="space-y-3">
+        <h2 className="font-semibold">ราคาก้อนเสริม (สระ/วรรณยุกต์ ภาษาไทย)</h2>
+        <Card>
+          <form action={saveAddon} className="flex flex-wrap items-end gap-2">
+            <label className="text-sm">
+              ราคา/ก้อน (บาท)
+              <input name="addon_price" type="number" min={0} step="0.5" defaultValue={addonPrice} className={`${inp} w-32`} />
+            </label>
+            <button className={btnSave}>บันทึก</button>
+            <p className="w-full text-xs text-muted">
+              สระบน/ล่าง และวรรณยุกต์ที่แปะเสริม คิดราคานี้ต่อก้อน (ก้อนบนที่ซ้อนจุดเดียวกัน เช่น ◌ั +
+              ◌้ นับเป็น 1 ก้อน) · เพิ่มสต็อกเครื่องหมายเดี่ยว (◌ิ ◌ี ◌ุ ◌ู ◌่ ◌้ ฯลฯ) ได้ที่ช่อง “เพิ่มตัวอักษร” ด้านล่าง
+            </p>
+          </form>
+        </Card>
+      </div>
       <div className="space-y-3">
         <h2 className="font-semibold">สีของตัวอักษร</h2>
         <Card>

@@ -22,7 +22,7 @@ export default async function ItemsPage() {
   if (!(await isAdmin())) redirect("/admin/login");
 
   const sb = createAdminClient();
-  const [types, sizes, baseColors, variants, keycapColors, stock, pendants, platforms, npCfg, npColors] =
+  const [types, sizes, baseColors, variants, keycapColors, stock, pendants, platforms, npCfg, npColors, kcCfg] =
     await Promise.all([
       sb.from("base_types").select("*").order("sort_order"),
       sb.from("base_sizes").select("*").order("sort_order"),
@@ -34,6 +34,7 @@ export default async function ItemsPage() {
       sb.from("social_platforms").select("*").order("sort_order"),
       sb.from("nameplate_config").select("base_price,price_per_char,price_per_size_mm,price_per_mm_thick,stroke_surcharge,icon_surcharge,min_deposit_percent,active").eq("id", 1).maybeSingle(),
       sb.from("nameplate_colors").select("*").order("sort_order"),
+      sb.from("keycap_config").select("addon_price").eq("id", 1).maybeSingle(),
     ]);
 
   return (
@@ -61,6 +62,7 @@ export default async function ItemsPage() {
           }
         }
         nameplateColors={(npColors.data ?? []) as NameplateColor[]}
+        keycapAddonPrice={Number((kcCfg.data as { addon_price?: number } | null)?.addon_price ?? 5)}
       />
     </div>
   );

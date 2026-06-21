@@ -154,6 +154,7 @@ export type Catalog = {
   keycapColors: KeycapColor[];
   keycapStock: KeycapStock[];
   pendants: Pendant[];
+  addonPrice: number;
 };
 
 // A single chosen letter in the wizard
