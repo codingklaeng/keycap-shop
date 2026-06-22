@@ -796,7 +796,37 @@ function KeycapsTab({
   const chars = Array.from(new Set(stock.map((s) => s.char))).sort();
   const stockMap = new Map(stock.map((s) => [`${s.char}|${s.color_id}`, s.stock]));
   const [newChars, setNewChars] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const allSelected = chars.length > 0 && chars.every((ch) => selected.has(ch));
+  function toggleSel(ch: string) {
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (n.has(ch)) n.delete(ch);
+      else n.add(ch);
+      return n;
+    });
+  }
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(chars));
+  }
+  async function deleteSelected() {
+    if (selected.size === 0) return;
+    if (!confirm(`ลบตัวอักษรที่เลือก ${selected.size} ตัว (ทุกสี)?`)) return;
+    for (const ch of selected) await removeKeycapChar(ch);
+    setSelected(new Set());
+    onDone();
+  }
+  async function zeroSelected() {
+    if (selected.size === 0) return;
+    const rows: { char: string; color_id: string; stock: number }[] = [];
+    for (const ch of selected)
+      for (const c of colors) rows.push({ char: ch, color_id: c.id, stock: 0 });
+    await bulkSetKeycapStock(rows);
+    setSelected(new Set());
+    onDone();
+  }
 
   function exportStock() {
     const header = ["char", ...colors.map((c) => c.name)];
@@ -1011,6 +1041,27 @@ function KeycapsTab({
           </p>
         </Card>
 
+        {selected.size > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary bg-primary/5 px-4 py-2 text-sm">
+            <span className="font-medium">เลือกไว้ {selected.size} ตัว</span>
+            <button
+              onClick={zeroSelected}
+              className="rounded-lg border border-border bg-card px-3 py-1.5 font-medium hover:border-primary"
+            >
+              ตั้งสต็อก = 0
+            </button>
+            <button
+              onClick={deleteSelected}
+              className="rounded-lg border border-red-300 bg-card px-3 py-1.5 font-medium text-red-600 hover:border-red-500"
+            >
+              🗑 ลบที่เลือก
+            </button>
+            <button onClick={() => setSelected(new Set())} className="text-muted underline">
+              ยกเลิกเลือก
+            </button>
+          </div>
+        )}
+
         {chars.length === 0 ? (
           <p className="text-sm text-muted">ยังไม่มีตัวอักษร เพิ่มด้านบนก่อน</p>
         ) : (
@@ -1030,30 +1081,49 @@ function KeycapsTab({
                       <div className="text-[10px] text-muted">{c.name}</div>
                     </th>
                   ))}
-                  <th />
+                  <th className="p-2">
+                    <label className="flex flex-col items-center gap-0.5 text-[10px] text-muted">
+                      <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+                      เลือกทั้งหมด
+                    </label>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {chars.map((ch) => (
                   <tr key={ch} className="border-t border-border">
-                    <td className="sticky left-0 bg-card p-2 font-bold">{ch}</td>
-                    {colors.map((c) => (
-                      <td key={c.id} className="p-1">
-                        <StockCell char={ch} colorId={c.id} initial={stockMap.get(`${ch}|${c.id}`) ?? 0} />
-                      </td>
-                    ))}
+                    <td className="sticky left-0 bg-card p-2">
+                      <span className="inline-flex min-w-[2rem] justify-center text-3xl font-bold leading-none">
+                        {ch}
+                      </span>
+                    </td>
+                    {colors.map((c) => {
+                      const v = stockMap.get(`${ch}|${c.id}`) ?? 0;
+                      return (
+                        <td key={c.id} className="p-1">
+                          <StockCell key={`${ch}|${c.id}|${v}`} char={ch} colorId={c.id} initial={v} />
+                        </td>
+                      );
+                    })}
                     <td className="p-1">
-                      <button
-                        onClick={async () => {
-                          if (confirm(`ลบตัวอักษร "${ch}" ทุกสี?`)) {
-                            await removeKeycapChar(ch);
-                            onDone();
-                          }
-                        }}
-                        className="text-xs text-red-500"
-                      >
-                        ลบแถว
-                      </button>
+                      <div className="flex items-center justify-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(ch)}
+                          onChange={() => toggleSel(ch)}
+                        />
+                        <button
+                          onClick={async () => {
+                            if (confirm(`ลบตัวอักษร "${ch}" ทุกสี?`)) {
+                              await removeKeycapChar(ch);
+                              onDone();
+                            }
+                          }}
+                          className="text-xs text-red-500"
+                        >
+                          ลบ
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
