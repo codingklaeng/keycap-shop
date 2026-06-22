@@ -119,6 +119,7 @@ export function ItemsManager(props: {
         <KeycapsTab
           colors={props.keycapColors}
           stock={props.keycapStock}
+          types={props.baseTypes}
           addonPrice={props.keycapAddonPrice}
           onDone={refresh}
         />
@@ -783,16 +784,25 @@ const QUICK_SETS: { label: string; chars: string }[] = [
 ];
 
 function KeycapsTab({
-  colors,
-  stock,
+  colors: allColors,
+  stock: allStock,
+  types,
   addonPrice,
   onDone,
 }: {
   colors: KeycapColor[];
   stock: KeycapStock[];
+  types: BaseType[];
   addonPrice: number;
   onDone: () => void;
 }) {
+  const [selType, setSelType] = useState(types[0]?.id ?? "");
+  // colors + stock are per keycap shape (base type)
+  const colors = allColors.filter((c) => c.base_type_id === selType);
+  const colorIdSet = new Set(colors.map((c) => c.id));
+  const stock = allStock.filter((s) => colorIdSet.has(s.color_id));
+  const colorIds = colors.map((c) => c.id);
+
   const chars = Array.from(new Set(stock.map((s) => s.char))).sort();
   const stockMap = new Map(stock.map((s) => [`${s.char}|${s.color_id}`, s.stock]));
   const [newChars, setNewChars] = useState("");
@@ -813,8 +823,8 @@ function KeycapsTab({
   }
   async function deleteSelected() {
     if (selected.size === 0) return;
-    if (!confirm(`ลบตัวอักษรที่เลือก ${selected.size} ตัว (ทุกสี)?`)) return;
-    for (const ch of selected) await removeKeycapChar(ch);
+    if (!confirm(`ลบตัวอักษรที่เลือก ${selected.size} ตัว (แบบแป้นนี้)?`)) return;
+    for (const ch of selected) await removeKeycapChar(ch, colorIds);
     setSelected(new Set());
     onDone();
   }
@@ -886,6 +896,7 @@ function KeycapsTab({
     await saveKeycapColor({
       id,
       name: String(fd.get("name")),
+      base_type_id: selType,
       key_color: String(fd.get("key_color")),
       text_color: String(fd.get("text_color")),
       price: num(fd, "price"),
@@ -899,21 +910,47 @@ function KeycapsTab({
     const list = Array.from(
       new Set(newChars.toUpperCase().split("").map((c) => c.trim()).filter(Boolean))
     );
-    if (list.length === 0) return;
-    await addKeycapChars(list);
+    if (list.length === 0 || !selType) return;
+    await addKeycapChars(list, selType);
     setNewChars("");
     onDone();
   }
 
   async function quickAdd(str: string) {
     const list = Array.from(new Set(Array.from(str))).filter((c) => c.trim());
-    if (list.length === 0) return;
-    await addKeycapChars(list);
+    if (list.length === 0 || !selType) return;
+    await addKeycapChars(list, selType);
     onDone();
   }
 
   return (
     <div className="space-y-6">
+      <div>
+        <h2 className="mb-2 font-semibold">เลือกแบบแป้น (สี + สต็อกแยกตามแบบ)</h2>
+        {types.length === 0 ? (
+          <p className="text-sm text-muted">เพิ่ม “แบบฐาน” ก่อนในแท็บแรก</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {types.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => {
+                  setSelType(t.id);
+                  setSelected(new Set());
+                }}
+                className={`rounded-lg border px-4 py-2 text-sm font-medium ${
+                  selType === t.id
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-card text-muted"
+                }`}
+              >
+                {t.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="space-y-3">
         <h2 className="font-semibold">ราคาก้อนเสริม (สระ/วรรณยุกต์ ภาษาไทย)</h2>
         <Card>
@@ -1114,8 +1151,8 @@ function KeycapsTab({
                         />
                         <button
                           onClick={async () => {
-                            if (confirm(`ลบตัวอักษร "${ch}" ทุกสี?`)) {
-                              await removeKeycapChar(ch);
+                            if (confirm(`ลบตัวอักษร "${ch}" (แบบแป้นนี้)?`)) {
+                              await removeKeycapChar(ch, colorIds);
                               onDone();
                             }
                           }}

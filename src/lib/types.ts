@@ -37,6 +37,7 @@ export type BaseVariant = {
 export type KeycapColor = {
   id: string;
   name: string;
+  base_type_id: string | null; // keycap shape (base type) this color belongs to
   key_color: string; // สีแป้น (keycap background)
   text_color: string; // สีตัวหนังสือ (legend color)
   image_url: string | null;

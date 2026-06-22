@@ -81,15 +81,20 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
     [units]
   );
 
+  // letter colors belong to a keycap shape (base type) — only show this type's
+  const typeColors = useMemo(
+    () => catalog.keycapColors.filter((c) => c.base_type_id === typeId),
+    [catalog.keycapColors, typeId]
+  );
   // colors in which a whole unit is makeable (base + every mark all in stock)
   const colorsForUnit = useMemo(() => {
     return (u: Unit) => {
       const pieces = unitPieceChars(u);
-      return catalog.keycapColors.filter((c) =>
+      return typeColors.filter((c) =>
         pieces.every((pc) => availability.get(pc)?.has(c.id))
       );
     };
-  }, [catalog.keycapColors, availability]);
+  }, [typeColors, availability]);
 
   const size = catalog.baseSizes.find((s) => s.id === sizeId) ?? null;
   const variant =
@@ -319,6 +324,7 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
                         setTypeId(t.id);
                         setSizeId(null);
                         setColorId(null);
+                        setLetterColors({});
                       }}
                       className={`rounded-xl border px-4 py-2 font-medium transition ${
                         t.id === typeId

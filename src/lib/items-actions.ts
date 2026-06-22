@@ -47,6 +47,7 @@ type BaseVariantInput = {
 type KeycapColorInput = {
   id?: string;
   name: string;
+  base_type_id: string; // keycap shape this color belongs to
   key_color?: string;
   text_color?: string;
   image_url?: string | null;
@@ -158,20 +159,28 @@ export async function saveKeycapColor(input: KeycapColorInput) {
     .single();
   if (error) throw new Error(error.message);
 
-  // ensure a stock row exists for this color for every existing char
+  // ensure a stock row exists for this color for every char already stocked in
+  // the SAME keycap shape (so a new color appears in that shape's stock table)
   if (data?.id) {
-    const { data: chars } = await sb
-      .from("keycap_stock")
-      .select("char")
-      .order("char");
-    const distinct = Array.from(new Set((chars ?? []).map((c) => c.char)));
-    if (distinct.length > 0) {
-      await sb
+    const { data: typeColors } = await sb
+      .from("keycap_colors")
+      .select("id")
+      .eq("base_type_id", input.base_type_id);
+    const colorIds = (typeColors ?? []).map((c) => c.id);
+    if (colorIds.length > 0) {
+      const { data: chars } = await sb
         .from("keycap_stock")
-        .upsert(
-          distinct.map((ch) => ({ char: ch, color_id: data.id, stock: 0 })),
-          { onConflict: "char,color_id", ignoreDuplicates: true }
-        );
+        .select("char")
+        .in("color_id", colorIds);
+      const distinct = Array.from(new Set((chars ?? []).map((c) => c.char)));
+      if (distinct.length > 0) {
+        await sb
+          .from("keycap_stock")
+          .upsert(
+            distinct.map((ch) => ({ char: ch, color_id: data.id, stock: 0 })),
+            { onConflict: "char,color_id", ignoreDuplicates: true }
+          );
+      }
     }
   }
 }
@@ -280,10 +289,14 @@ export async function bulkSetKeycapStock(
   return { saved: clean.length };
 }
 
-// Add one or more characters: creates a stock row (default 0) for each keycap color.
-export async function addKeycapChars(chars: string[]) {
+// Add one or more characters: creates a stock row (default 0) for each keycap
+// color of the given keycap shape (base type).
+export async function addKeycapChars(chars: string[], baseTypeId: string) {
   const sb = await guard();
-  const { data: colors } = await sb.from("keycap_colors").select("id");
+  const { data: colors } = await sb
+    .from("keycap_colors")
+    .select("id")
+    .eq("base_type_id", baseTypeId);
   const colorIds = (colors ?? []).map((c) => c.id);
   const rows = chars.flatMap((ch) =>
     colorIds.map((cid) => ({ char: ch, color_id: cid, stock: 0 }))
@@ -295,9 +308,13 @@ export async function addKeycapChars(chars: string[]) {
   if (error) throw new Error(error.message);
 }
 
-export async function removeKeycapChar(char: string) {
+// Remove a character's stock rows — limited to the given colors (one shape) when
+// colorIds is provided, otherwise every color.
+export async function removeKeycapChar(char: string, colorIds?: string[]) {
   const sb = await guard();
-  const { error } = await sb.from("keycap_stock").delete().eq("char", char);
+  let q = sb.from("keycap_stock").delete().eq("char", char);
+  if (colorIds && colorIds.length > 0) q = q.in("color_id", colorIds);
+  const { error } = await q;
   if (error) throw new Error(error.message);
 }
 
