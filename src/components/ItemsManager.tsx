@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ImageUpload } from "@/components/ImageUpload";
+import { levelOf } from "@/lib/thai";
 import {
   saveBaseType,
   saveBaseSize,
@@ -771,6 +772,32 @@ function parseCsv(text: string): string[][] {
   return rows;
 }
 
+// Classify a stocked character into a filter category.
+function charCategory(ch: string): string {
+  const lv = levelOf(ch);
+  if (lv === "upper") return "upper";
+  if (lv === "lower") return "lower";
+  const cp = ch.codePointAt(0) ?? 0;
+  if (cp >= 0x0e01 && cp <= 0x0e2e) return "consonant"; // ก–ฮ (รวม ฤ ฦ)
+  if ((cp >= 0x0e30 && cp <= 0x0e33) || (cp >= 0x0e40 && cp <= 0x0e45)) return "vowel"; // ะ า ำ เ แ โ ใ ไ ๅ
+  if (cp >= 0x0e50 && cp <= 0x0e59) return "thaidigit"; // ๐–๙
+  if (/[A-Za-z]/.test(ch)) return "latin";
+  if (/[0-9]/.test(ch)) return "digit";
+  return "other";
+}
+
+const CAT_ORDER = ["consonant", "vowel", "upper", "lower", "thaidigit", "latin", "digit", "other"];
+const CAT_LABEL: Record<string, string> = {
+  consonant: "พยัญชนะ",
+  vowel: "สระเต็ม",
+  upper: "ก้อนบน",
+  lower: "ก้อนล่าง",
+  thaidigit: "เลขไทย",
+  latin: "A–Z",
+  digit: "0–9",
+  other: "อื่นๆ",
+};
+
 // One-click Thai/Latin character sets for stocking keycaps.
 const QUICK_SETS: { label: string; chars: string }[] = [
   { label: "พยัญชนะ ก–ฮ", chars: "กขฃคฅฆงจฉชซฌญฎฏฐฑฒณดตถทธนบปผฝพฟภมยรลวศษสหฬอฮฤฦ" },
@@ -798,6 +825,7 @@ function KeycapsTab({
 }) {
   const [selType, setSelType] = useState(types[0]?.id ?? "");
   const [colFilter, setColFilter] = useState<Set<string>>(new Set());
+  const [typeFilter, setTypeFilter] = useState<Set<string>>(new Set());
   // colors + stock are per keycap shape (base type)
   const colors = allColors.filter((c) => c.base_type_id === selType);
   const colorIdSet = new Set(colors.map((c) => c.id));
@@ -808,11 +836,15 @@ function KeycapsTab({
 
   const chars = Array.from(new Set(stock.map((s) => s.char))).sort();
   const stockMap = new Map(stock.map((s) => [`${s.char}|${s.color_id}`, s.stock]));
+  // character-type view filter (empty = all). Affects the table rows + export.
+  const presentCats = CAT_ORDER.filter((cat) => chars.some((ch) => charCategory(ch) === cat));
+  const visibleChars =
+    typeFilter.size === 0 ? chars : chars.filter((ch) => typeFilter.has(charCategory(ch)));
   const [newChars, setNewChars] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const allSelected = chars.length > 0 && chars.every((ch) => selected.has(ch));
+  const allSelected = visibleChars.length > 0 && visibleChars.every((ch) => selected.has(ch));
   function toggleSel(ch: string) {
     setSelected((prev) => {
       const n = new Set(prev);
@@ -822,7 +854,7 @@ function KeycapsTab({
     });
   }
   function toggleAll() {
-    setSelected(allSelected ? new Set() : new Set(chars));
+    setSelected(allSelected ? new Set() : new Set(visibleChars));
   }
   async function deleteSelected() {
     if (selected.size === 0) return;
@@ -844,7 +876,7 @@ function KeycapsTab({
   function exportStock() {
     const header = ["char", ...visibleColors.map((c) => c.name)];
     const lines = [header.map(csvEscape).join(",")];
-    for (const ch of chars) {
+    for (const ch of visibleChars) {
       const row = [ch, ...visibleColors.map((c) => String(stockMap.get(`${ch}|${c.id}`) ?? 0))];
       lines.push(row.map(csvEscape).join(","));
     }
@@ -941,6 +973,7 @@ function KeycapsTab({
                   setSelType(t.id);
                   setSelected(new Set());
                   setColFilter(new Set());
+                  setTypeFilter(new Set());
                 }}
                 className={`rounded-lg border px-4 py-2 text-sm font-medium ${
                   selType === t.id
@@ -1082,6 +1115,41 @@ function KeycapsTab({
           </p>
         </Card>
 
+        {presentCats.length > 1 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted">กรองประเภท:</span>
+            <button
+              onClick={() => setTypeFilter(new Set())}
+              className={`rounded-full border px-2.5 py-1 text-xs ${
+                typeFilter.size === 0 ? "border-primary bg-primary/10 text-primary" : "border-border text-muted"
+              }`}
+            >
+              ทั้งหมด
+            </button>
+            {presentCats.map((cat) => {
+              const on = typeFilter.has(cat);
+              return (
+                <button
+                  key={cat}
+                  onClick={() =>
+                    setTypeFilter((prev) => {
+                      const n = new Set(prev);
+                      if (n.has(cat)) n.delete(cat);
+                      else n.add(cat);
+                      return n;
+                    })
+                  }
+                  className={`rounded-full border px-2.5 py-1 text-xs ${
+                    on ? "border-primary bg-primary/10 text-primary" : "border-border text-muted"
+                  }`}
+                >
+                  {CAT_LABEL[cat]}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {colors.length > 1 && (
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-xs text-muted">กรองสี:</span>
@@ -1170,7 +1238,7 @@ function KeycapsTab({
                 </tr>
               </thead>
               <tbody>
-                {chars.map((ch) => (
+                {visibleChars.map((ch) => (
                   <tr key={ch} className="border-t border-border">
                     <td className="sticky left-0 bg-card p-2">
                       <span className="inline-flex min-w-[2rem] justify-center text-3xl font-bold leading-none">
