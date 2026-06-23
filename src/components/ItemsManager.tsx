@@ -797,11 +797,14 @@ function KeycapsTab({
   onDone: () => void;
 }) {
   const [selType, setSelType] = useState(types[0]?.id ?? "");
+  const [colFilter, setColFilter] = useState<Set<string>>(new Set());
   // colors + stock are per keycap shape (base type)
   const colors = allColors.filter((c) => c.base_type_id === selType);
   const colorIdSet = new Set(colors.map((c) => c.id));
   const stock = allStock.filter((s) => colorIdSet.has(s.color_id));
   const colorIds = colors.map((c) => c.id);
+  // optional per-color view filter (empty = show all). Affects the table + export.
+  const visibleColors = colFilter.size === 0 ? colors : colors.filter((c) => colFilter.has(c.id));
 
   const chars = Array.from(new Set(stock.map((s) => s.char))).sort();
   const stockMap = new Map(stock.map((s) => [`${s.char}|${s.color_id}`, s.stock]));
@@ -832,17 +835,17 @@ function KeycapsTab({
     if (selected.size === 0) return;
     const rows: { char: string; color_id: string; stock: number }[] = [];
     for (const ch of selected)
-      for (const c of colors) rows.push({ char: ch, color_id: c.id, stock: 0 });
+      for (const c of visibleColors) rows.push({ char: ch, color_id: c.id, stock: 0 });
     await bulkSetKeycapStock(rows);
     setSelected(new Set());
     onDone();
   }
 
   function exportStock() {
-    const header = ["char", ...colors.map((c) => c.name)];
+    const header = ["char", ...visibleColors.map((c) => c.name)];
     const lines = [header.map(csvEscape).join(",")];
     for (const ch of chars) {
-      const row = [ch, ...colors.map((c) => String(stockMap.get(`${ch}|${c.id}`) ?? 0))];
+      const row = [ch, ...visibleColors.map((c) => String(stockMap.get(`${ch}|${c.id}`) ?? 0))];
       lines.push(row.map(csvEscape).join(","));
     }
     const csv = "﻿" + lines.join("\r\n");
@@ -937,6 +940,7 @@ function KeycapsTab({
                 onClick={() => {
                   setSelType(t.id);
                   setSelected(new Set());
+                  setColFilter(new Set());
                 }}
                 className={`rounded-lg border px-4 py-2 text-sm font-medium ${
                   selType === t.id
@@ -1078,6 +1082,45 @@ function KeycapsTab({
           </p>
         </Card>
 
+        {colors.length > 1 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted">กรองสี:</span>
+            <button
+              onClick={() => setColFilter(new Set())}
+              className={`rounded-full border px-2.5 py-1 text-xs ${
+                colFilter.size === 0 ? "border-primary bg-primary/10 text-primary" : "border-border text-muted"
+              }`}
+            >
+              ทั้งหมด
+            </button>
+            {colors.map((c) => {
+              const on = colFilter.has(c.id);
+              return (
+                <button
+                  key={c.id}
+                  onClick={() =>
+                    setColFilter((prev) => {
+                      const n = new Set(prev);
+                      if (n.has(c.id)) n.delete(c.id);
+                      else n.add(c.id);
+                      return n;
+                    })
+                  }
+                  className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${
+                    on ? "border-primary bg-primary/10 text-primary" : "border-border text-muted"
+                  }`}
+                >
+                  <span
+                    className="h-3 w-3 rounded-full border border-border"
+                    style={{ background: c.key_color }}
+                  />
+                  {c.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {selected.size > 0 && (
           <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary bg-primary/5 px-4 py-2 text-sm">
             <span className="font-medium">เลือกไว้ {selected.size} ตัว</span>
@@ -1107,7 +1150,7 @@ function KeycapsTab({
               <thead>
                 <tr>
                   <th className="sticky left-0 bg-background p-2 text-left">ตัว</th>
-                  {colors.map((c) => (
+                  {visibleColors.map((c) => (
                     <th key={c.id} className="p-2">
                       <span
                         className="mx-auto flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold"
@@ -1134,7 +1177,7 @@ function KeycapsTab({
                         {ch}
                       </span>
                     </td>
-                    {colors.map((c) => {
+                    {visibleColors.map((c) => {
                       const v = stockMap.get(`${ch}|${c.id}`) ?? 0;
                       return (
                         <td key={c.id} className="p-1">
