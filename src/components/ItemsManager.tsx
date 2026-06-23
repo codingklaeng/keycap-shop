@@ -71,7 +71,9 @@ export function ItemsManager(props: {
     price_per_size_mm: number;
     price_per_mm_thick: number;
     stroke_surcharge: number;
-    icon_surcharge: number;
+    edge_surcharge_per_char: number;
+    icon_surcharge_small: number;
+    icon_surcharge_large: number;
     min_deposit_percent: number;
     active: boolean;
   };
@@ -151,7 +153,9 @@ function NameplateTab({
     price_per_size_mm: number;
     price_per_mm_thick: number;
     stroke_surcharge: number;
-    icon_surcharge: number;
+    edge_surcharge_per_char: number;
+    icon_surcharge_small: number;
+    icon_surcharge_large: number;
     min_deposit_percent: number;
     active: boolean;
   };
@@ -164,7 +168,9 @@ function NameplateTab({
       price_per_size_mm: num(fd, "price_per_size_mm"),
       price_per_mm_thick: num(fd, "price_per_mm_thick"),
       stroke_surcharge: num(fd, "stroke_surcharge"),
-      icon_surcharge: num(fd, "icon_surcharge"),
+      edge_surcharge_per_char: num(fd, "edge_surcharge_per_char"),
+      icon_surcharge_small: num(fd, "icon_surcharge_small"),
+      icon_surcharge_large: num(fd, "icon_surcharge_large"),
       min_deposit_percent: num(fd, "min_deposit_percent"),
       active: fd.get("active") === "on",
     });
@@ -174,7 +180,8 @@ function NameplateTab({
     <div className="space-y-3">
       <p className="text-sm text-muted">
         ราคา = ฐาน + (ต่อตัวอักษร × จำนวนตัว) + (ต่อมม.ขนาด × ขนาด) + (ต่อมม.หนา ×
-        ความหนารวม 3 ชั้น) + ค่าเส้นขอบ(ถ้าเลือก) — ลูกค้าออกแบบเอง แล้วร้านดาวน์โหลด STL ไปปริ้น 3D
+        ความหนารวม 3 ชั้น) + ค่าเส้นขอบ(ถ้าเลือก) + ค่าขอบฐานคม/มน(× จำนวนตัว — “ตามตัวอักษร” ไม่คิด) +
+        ค่าไอคอน(ตามขนาด ≤1 เท่า / &gt;1 เท่า) — ลูกค้าออกแบบเอง แล้วร้านดาวน์โหลด STL ไปปริ้น 3D
       </p>
       <Card>
         <form action={save} className="grid grid-cols-2 gap-3">
@@ -199,8 +206,16 @@ function NameplateTab({
             <input name="stroke_surcharge" type="number" min={0} step="0.01" defaultValue={config.stroke_surcharge} className={`${inp} w-full`} />
           </label>
           <label className="text-sm">
-            ค่าเพิ่มเมื่อมีไอคอน (บาท)
-            <input name="icon_surcharge" type="number" min={0} step="0.01" defaultValue={config.icon_surcharge} className={`${inp} w-full`} />
+            ค่าขอบฐาน คม/มน · ต่อตัวอักษร (บาท)
+            <input name="edge_surcharge_per_char" type="number" min={0} step="0.01" defaultValue={config.edge_surcharge_per_char} className={`${inp} w-full`} />
+          </label>
+          <label className="text-sm">
+            ไอคอน ≤1 เท่า (บาท)
+            <input name="icon_surcharge_small" type="number" min={0} step="0.01" defaultValue={config.icon_surcharge_small} className={`${inp} w-full`} />
+          </label>
+          <label className="text-sm">
+            ไอคอน &gt;1 เท่า (บาท)
+            <input name="icon_surcharge_large" type="number" min={0} step="0.01" defaultValue={config.icon_surcharge_large} className={`${inp} w-full`} />
           </label>
           <label className="text-sm">
             มัดจำขั้นต่ำก่อนเริ่มผลิต (%)
