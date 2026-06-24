@@ -87,6 +87,10 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
   const hasIcon = !!spec.icon && spec.icon !== "none";
   const totalThick =
     spec.baseThickness + (hasStroke ? spec.strokeHeight ?? 2 : 0) + spec.thickness;
+  const strokeFee = hasStroke
+    ? Number(config.stroke_surcharge) +
+      Number(config.stroke_price_per_width_char) * (spec.strokeWidth ?? 0) * charCount
+    : 0;
   const edgeFee =
     spec.edge === "contour" ? 0 : Number(config.edge_surcharge_per_char) * charCount;
   const iconFee = hasIcon
@@ -99,7 +103,7 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
     Number(config.price_per_char) * charCount +
     Number(config.price_per_size_mm) * spec.size +
     Number(config.price_per_mm_thick) * totalThick +
-    (hasStroke ? Number(config.stroke_surcharge) : 0) +
+    strokeFee +
     edgeFee +
     iconFee;
 

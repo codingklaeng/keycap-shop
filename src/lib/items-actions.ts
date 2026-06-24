@@ -224,6 +224,7 @@ export async function saveNameplateConfig(input: {
   price_per_size_mm: number;
   price_per_mm_thick: number;
   stroke_surcharge: number;
+  stroke_price_per_width_char: number;
   edge_surcharge_per_char: number;
   icon_surcharge_small: number;
   icon_surcharge_large: number;

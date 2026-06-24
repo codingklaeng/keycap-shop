@@ -32,7 +32,7 @@ export default async function ItemsPage() {
       sb.from("keycap_stock").select("*"),
       sb.from("pendants").select("*").order("sort_order"),
       sb.from("social_platforms").select("*").order("sort_order"),
-      sb.from("nameplate_config").select("base_price,price_per_char,price_per_size_mm,price_per_mm_thick,stroke_surcharge,edge_surcharge_per_char,icon_surcharge_small,icon_surcharge_large,min_deposit_percent,active").eq("id", 1).maybeSingle(),
+      sb.from("nameplate_config").select("base_price,price_per_char,price_per_size_mm,price_per_mm_thick,stroke_surcharge,stroke_price_per_width_char,edge_surcharge_per_char,icon_surcharge_small,icon_surcharge_large,min_deposit_percent,active").eq("id", 1).maybeSingle(),
       sb.from("nameplate_colors").select("*").order("sort_order"),
       sb.from("keycap_config").select("addon_price").eq("id", 1).maybeSingle(),
     ]);
@@ -56,6 +56,7 @@ export default async function ItemsPage() {
             price_per_size_mm: 1.5,
             price_per_mm_thick: 5,
             stroke_surcharge: 30,
+            stroke_price_per_width_char: 0,
             edge_surcharge_per_char: 0,
             icon_surcharge_small: 20,
             icon_surcharge_large: 30,
