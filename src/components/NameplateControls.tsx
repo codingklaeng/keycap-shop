@@ -1,11 +1,13 @@
 "use client";
 
+import { useRef } from "react";
 import {
   NAMEPLATE_FONTS,
   NAMEPLATE_ICONS,
   type NameplateSpec,
   type RingPos,
 } from "@/lib/nameplate";
+import { EmojiPicker } from "@/components/EmojiPicker";
 
 type SetSpec = <K extends keyof NameplateSpec>(k: K, v: NameplateSpec[K]) => void;
 
@@ -63,16 +65,28 @@ export function NameplateControls({
   const hasIcon = !!spec.icon && spec.icon !== "none";
   const iconHasAccent =
     hasIcon && !!NAMEPLATE_ICONS.find((i) => i.name === spec.icon)?.accent;
+  const textInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="space-y-5">
       <Field label="ข้อความ">
-        <input
-          value={spec.text}
-          onChange={(e) => set("text", e.target.value)}
-          placeholder="พิมพ์ชื่อ/ข้อความ"
-          className="w-full rounded-xl border border-border bg-card px-4 py-3 text-lg font-semibold outline-none focus:border-primary"
-        />
+        <div className="flex gap-2">
+          <input
+            ref={textInputRef}
+            value={spec.text}
+            onChange={(e) => set("text", e.target.value)}
+            placeholder="พิมพ์ชื่อ/ข้อความ"
+            className="w-full min-w-0 flex-1 rounded-xl border border-border bg-card px-4 py-3 text-lg font-semibold outline-none focus:border-primary"
+          />
+          <EmojiPicker
+            inputRef={textInputRef}
+            value={spec.text}
+            onChange={(v) => set("text", v)}
+          />
+        </div>
+        <p className="mt-1 text-xs text-muted">
+          แตะปุ่ม 🙂 เพื่อแทรกอิโมจิ — นับเป็นตัวอักษร 1 ตัวเช่นกัน
+        </p>
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
