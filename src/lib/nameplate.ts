@@ -945,6 +945,26 @@ function paintDilatedSilhouette(
   dstCtx.drawImage(tmp, 0, 0);
 }
 
+// Tight bounding box (canvas px) of the opaque pixels in `ctx`, or null if empty.
+function inkBounds(ctx: CanvasRenderingContext2D, W: number, H: number) {
+  const px = ctx.getImageData(0, 0, W, H).data;
+  let minX = W;
+  let minY = H;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (px[(y * W + x) * 4 + 3] > 40) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  return maxX < 0 ? null : { minX, minY, maxX, maxY };
+}
+
 /** A flat top-view colored thumbnail (PNG data URL) of the nameplate — light
  *  enough to show many at once on the shop board (no WebGL), and it matches how
  *  the printed piece lies flat so staff can grab the right one. */
@@ -1035,20 +1055,52 @@ export async function nameplateThumbnail(spec: NameplateSpec): Promise<string> {
   const iX = iconX + dx;
   const iY = iconY + dy;
 
-  // keyring (under the plate)
-  if (ringOn) {
-    ctx.lineWidth = ringBar * 2;
-    ctx.strokeStyle = baseColor;
-    ctx.beginPath();
-    ctx.arc(rcx + dx, rcy + dy, Math.max(1, ringR - ringBar), 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
   // Silhouette of every printed front feature (text + icon + colour emoji),
-  // reused to grow the base/stroke so they hug emoji exactly like the 3D does.
+  // reused both to grow the base/stroke (so they hug emoji like the 3D does)
+  // and to locate the real plate edge the keyring hangs off.
   const inkCtx = newFrame(W, H);
   drawTextOn(inkCtx, spec, fontPx, tX, tY, 0, "#000000");
   if (icon) drawIconOn(inkCtx, icon, "all", iX, iY, iconSize, 0, "#000000");
+
+  // Actual base-plate edges (canvas px). Contour = ink silhouette grown by
+  // basePad; rect/round = the padded text box. The keyring attaches to THESE
+  // real edges (not the raw text box) — scaled-down emoji make the true contour
+  // narrower than the text box, so keying off the box left the ring floating.
+  const ib = inkBounds(inkCtx, W, H);
+  let baseLeft = bx0 + dx;
+  let baseRight = bx1 + dx;
+  let baseTop = by0 + dy;
+  let baseBottom = by1 + dy;
+  if (spec.edge === "contour" && ib) {
+    baseLeft = ib.minX - basePad;
+    baseRight = ib.maxX + basePad;
+    baseTop = ib.minY - basePad;
+    baseBottom = ib.maxY + basePad;
+  }
+
+  // keyring (under the plate), overlapping the real plate edge by 0.3·radius —
+  // the same attachment the 3D torus uses (rx = plate edge − 0.7·outerRadius).
+  if (ringOn) {
+    let rx: number;
+    let ry: number;
+    if (spec.ring === "left") {
+      rx = baseLeft - ringR * 0.7;
+      ry = (baseTop + baseBottom) / 2;
+    } else if (spec.ring === "right") {
+      rx = baseRight + ringR * 0.7;
+      ry = (baseTop + baseBottom) / 2;
+    } else {
+      rx = (baseLeft + baseRight) / 2;
+      ry = baseTop - ringR * 0.7;
+    }
+    rx += (spec.ringOffsetX ?? 0) * pxPerMM;
+    ry -= (spec.ringOffsetY ?? 0) * pxPerMM;
+    ctx.lineWidth = ringBar * 2;
+    ctx.strokeStyle = baseColor;
+    ctx.beginPath();
+    ctx.arc(rx, ry, Math.max(1, ringR - ringBar), 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
   // base layer — contour hugs everything via dilation; else a rounded rect
   if (spec.edge === "contour") {
