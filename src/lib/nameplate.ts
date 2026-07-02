@@ -319,6 +319,73 @@ function shapesFromValues(values: Float32Array, W: number, H: number): THREE.Sha
   return shapes;
 }
 
+// Morphological dilation (grow) of a scalar field by radius r, via an O(W·H)
+// separable sliding-window maximum. Used to expand the base/stroke silhouette
+// uniformly — including colour emoji, which strokeText can't reliably outline.
+function dilate(src: Float32Array, W: number, H: number, r: number): Float32Array {
+  r = Math.round(r);
+  if (r < 1) return src;
+  const idx = new Int32Array(Math.max(W, H));
+  const val = new Float32Array(Math.max(W, H));
+  const tmp = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) {
+    const base = y * W;
+    let head = 0;
+    let tail = 0;
+    for (let i = 0; i < W + r; i++) {
+      if (i < W) {
+        const v = src[base + i];
+        while (tail > head && val[tail - 1] <= v) tail--;
+        idx[tail] = i;
+        val[tail] = v;
+        tail++;
+      }
+      if (i >= r) {
+        const o = i - r;
+        const lo = o - r;
+        while (head < tail && idx[head] < lo) head++;
+        tmp[base + o] = val[head];
+      }
+    }
+  }
+  const out = new Float32Array(W * H);
+  for (let x = 0; x < W; x++) {
+    let head = 0;
+    let tail = 0;
+    for (let i = 0; i < H + r; i++) {
+      if (i < H) {
+        const v = tmp[i * W + x];
+        while (tail > head && val[tail - 1] <= v) tail--;
+        idx[tail] = i;
+        val[tail] = v;
+        tail++;
+      }
+      if (i >= r) {
+        const o = i - r;
+        const lo = o - r;
+        while (head < tail && idx[head] < lo) head++;
+        out[o * W + x] = val[head];
+      }
+    }
+  }
+  return out;
+}
+
+// Trace the alpha silhouette grown outward by `dilatePx` — for the contour base
+// and stroke layers so they hug text, icons AND emoji equally.
+function traceDilated(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  blurR: number,
+  dilatePx: number
+): THREE.Shape[] {
+  const px = ctx.getImageData(0, 0, W, H).data;
+  const raw = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) raw[i] = px[i * 4 + 3];
+  return shapesFromValues(boxBlur(dilate(raw, W, H, dilatePx), W, H, blurR), W, H);
+}
+
 // contour-trace a B/W canvas into polygons with holes (marching squares)
 function traceCanvas(
   ctx: CanvasRenderingContext2D,
@@ -627,12 +694,12 @@ export async function buildNameplate(
     }
   }
 
-  // --- stroke layer (middle): outline around text + icon ---
+  // --- stroke layer (middle): outline around text + icon (+ emoji) ---
   if (hasStroke) {
     const sc = newFrame(W, H);
-    drawTextOn(sc, spec, fontPx, originX, originY, strokeExpandPx);
-    if (icon) drawIconOn(sc, icon, "all", iconX, iconTop, iconSizePx, strokeExpandPx);
-    const sShapes = traceCanvas(sc, sc.canvas.width, sc.canvas.height, blurR);
+    drawTextOn(sc, spec, fontPx, originX, originY, 0); // fill; grown via dilation
+    if (icon) drawIconOn(sc, icon, "all", iconX, iconTop, iconSizePx, 0);
+    const sShapes = traceDilated(sc, sc.canvas.width, sc.canvas.height, blurR, strokeExpandPx);
     if (sShapes.length) {
       const geo = extrudeLayer(sShapes, strokeHmm, k, bevelMM);
       geo.translate(-cx, -cy, strokeBackZ);
@@ -643,9 +710,9 @@ export async function buildNameplate(
   // --- base layer (back): rectangular OR contour-hugging the text + icon ---
   if (spec.edge === "contour") {
     const bc = newFrame(W, H);
-    drawTextOn(bc, spec, fontPx, originX, originY, baseExpandPx);
-    if (icon) drawIconOn(bc, icon, "all", iconX, iconTop, iconSizePx, baseExpandPx);
-    const bShapes = traceCanvas(bc, bc.canvas.width, bc.canvas.height, blurR);
+    drawTextOn(bc, spec, fontPx, originX, originY, 0); // fill; grown via dilation
+    if (icon) drawIconOn(bc, icon, "all", iconX, iconTop, iconSizePx, 0);
+    const bShapes = traceDilated(bc, bc.canvas.width, bc.canvas.height, blurR, baseExpandPx);
     if (bShapes.length) {
       // The base is a SOLID plate: drop the inner holes (letter counters) so the
       // text never appears inside the base layers — the text is its own raised
