@@ -8,6 +8,17 @@ import { splitGraphemes } from "@/lib/graphemes";
 const EMOJI_RE = /\p{Extended_Pictographic}/u;
 const isEmoji = (g: string) => EMOJI_RE.test(g);
 
+// remove Thai upper/lower combining marks (leave consonants + spacing vowels)
+function stripThaiMarks(s: string): string {
+  let out = "";
+  for (const ch of s) {
+    const cp = ch.codePointAt(0) ?? 0;
+    const isMark = cp === 0x0e31 || (cp >= 0x0e34 && cp <= 0x0e3a) || (cp >= 0x0e47 && cp <= 0x0e4e);
+    if (!isMark) out += ch;
+  }
+  return out;
+}
+
 export type RingPos = "left" | "top" | "right" | "none";
 export type EdgeStyle = "sharp" | "round" | "contour";
 export type FontStyle = "normal" | "italic";
@@ -458,7 +469,10 @@ function glyphLayout(
   ctx.letterSpacing = "0px";
   ctx.textBaseline = "alphabetic";
   ctx.font = baseFont;
-  const rm = ctx.measureText(graphemes.filter((g) => !isEmoji(g)).join("") || "อ");
+  // measure the consonant-row height only (strip Thai upper/lower marks) so
+  // emoji match the letter body, not the full mark-extended height
+  const refStr = stripThaiMarks(graphemes.filter((g) => !isEmoji(g)).join("")) || "อ";
+  const rm = ctx.measureText(refStr);
   const la = rm.actualBoundingBoxAscent || fontPx * 0.72;
   const ld = rm.actualBoundingBoxDescent || fontPx * 0.12;
   const letterH = la + ld;
@@ -785,28 +799,32 @@ export async function buildNameplate(
     // rectangular/rounded plate sized to enclose everything added so far
     group.updateMatrixWorld(true);
     const cbox = new THREE.Box3().setFromObject(group);
-    const cw = cbox.max.x - cbox.min.x;
-    const ch = cbox.max.y - cbox.min.y;
-    const ccx = (cbox.max.x + cbox.min.x) / 2;
-    const ccy = (cbox.max.y + cbox.min.y) / 2;
-    const plateW = cw + padMM * 2;
-    const plateH = ch + padMM * 2;
-    const r = spec.edge === "round" ? Math.min(plateW, plateH) * 0.18 : 0.4;
-    const baseGeo = new THREE.ExtrudeGeometry(roundedRectShape(plateW, plateH, r), {
-      depth: baseT,
-      bevelEnabled: spec.edge === "round",
-      bevelThickness: 0.5,
-      bevelSize: 0.5,
-      bevelSegments: 2,
-    });
-    baseGeo.translate(ccx, ccy, 0);
-    group.add(new THREE.Mesh(baseGeo, baseMat));
+    // only if there's actual content (empty text → empty group → skip, no NaN)
+    if (isFinite(cbox.min.x)) {
+      const cw = cbox.max.x - cbox.min.x;
+      const ch = cbox.max.y - cbox.min.y;
+      const ccx = (cbox.max.x + cbox.min.x) / 2;
+      const ccy = (cbox.max.y + cbox.min.y) / 2;
+      const plateW = cw + padMM * 2;
+      const plateH = ch + padMM * 2;
+      const r = spec.edge === "round" ? Math.min(plateW, plateH) * 0.18 : 0.4;
+      const baseGeo = new THREE.ExtrudeGeometry(roundedRectShape(plateW, plateH, r), {
+        depth: baseT,
+        bevelEnabled: spec.edge === "round",
+        bevelThickness: 0.5,
+        bevelSize: 0.5,
+        bevelSegments: 2,
+      });
+      baseGeo.translate(ccx, ccy, 0);
+      group.add(new THREE.Mesh(baseGeo, baseMat));
+    }
   }
 
   // keyring placed at the outer edge of the whole plate (in y-up space)
   if (spec.ring !== "none") {
     group.updateMatrixWorld(true);
     const pbox = new THREE.Box3().setFromObject(group);
+    if (isFinite(pbox.min.x)) {
     const pw = pbox.max.x - pbox.min.x;
     const ph = pbox.max.y - pbox.min.y;
     // ring sizing: explicit (mm) from the user, or auto-scaled to the plate
@@ -829,10 +847,11 @@ export async function buildNameplate(
     else ry = pbox.max.y + rOuter * 0.7; // top
     rx += spec.ringOffsetX ?? 0;
     ry += spec.ringOffsetY ?? 0;
-    // the lowest point of the ring sits flush with the base bottom (z = 0) so
-    // it doesn't dip below the plate when the piece is printed lying flat.
-    ringGeo.translate(rx, ry, tube);
-    group.add(new THREE.Mesh(ringGeo, baseMat));
+      // the lowest point of the ring sits flush with the base bottom (z = 0) so
+      // it doesn't dip below the plate when the piece is printed lying flat.
+      ringGeo.translate(rx, ry, tube);
+      group.add(new THREE.Mesh(ringGeo, baseMat));
+    }
   }
 
   // center the whole model (including the ring) at the origin
@@ -842,7 +861,13 @@ export async function buildNameplate(
   const center = new THREE.Vector3();
   box.getSize(size);
   box.getCenter(center);
-  group.position.set(-center.x, -center.y, -center.z);
+  // empty group (e.g. blank text) → keep everything finite so the 3D view
+  // recovers cleanly once text is typed again
+  if (isFinite(center.x)) {
+    group.position.set(-center.x, -center.y, -center.z);
+  } else {
+    size.set(0, 0, 0);
+  }
   group.updateMatrixWorld(true);
 
   return { group, sizeMM: { w: size.x, h: size.y, d: size.z } };
