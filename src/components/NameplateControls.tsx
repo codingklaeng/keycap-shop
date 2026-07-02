@@ -7,6 +7,7 @@ import {
   type NameplateSpec,
   type RingPos,
 } from "@/lib/nameplate";
+import { splitGraphemes } from "@/lib/graphemes";
 import { EmojiPicker } from "@/components/EmojiPicker";
 
 type SetSpec = <K extends keyof NameplateSpec>(k: K, v: NameplateSpec[K]) => void;
@@ -66,6 +67,7 @@ export function NameplateControls({
   const iconHasAccent =
     hasIcon && !!NAMEPLATE_ICONS.find((i) => i.name === spec.icon)?.accent;
   const textInputRef = useRef<HTMLInputElement>(null);
+  const charCount = splitGraphemes(spec.text.trim()).length;
 
   return (
     <div className="space-y-5">
@@ -84,9 +86,14 @@ export function NameplateControls({
             onChange={(v) => set("text", v)}
           />
         </div>
-        <p className="mt-1 text-xs text-muted">
-          แตะปุ่ม 🙂 เพื่อแทรกอิโมจิ — นับเป็นตัวอักษร 1 ตัวเช่นกัน
-        </p>
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <p className="text-xs text-muted">
+            แตะปุ่ม 🙂 เพื่อแทรกอิโมจิ — นับเป็นตัวอักษร 1 ตัวเช่นกัน
+          </p>
+          <span className="shrink-0 text-xs font-medium text-muted tabular-nums">
+            {charCount} ตัวอักษร
+          </span>
+        </div>
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
