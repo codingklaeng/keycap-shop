@@ -443,6 +443,49 @@ function newFrame(W: number, H: number): CanvasRenderingContext2D {
 }
 
 // Paint the text, optionally grown outward by `expandPx` (half line width).
+// Per-grapheme layout: emoji are scaled down so they never exceed the letter
+// height, and returned with their x-position + font size. Shared by drawTextOn
+// and the emoji-detail range calc so positions always agree.
+type GlyphBox = { g: string; isEmoji: boolean; x: number; w: number; fpx: number };
+function glyphLayout(
+  ctx: CanvasRenderingContext2D,
+  spec: NameplateSpec,
+  fontPx: number,
+  originX: number
+): { glyphs: GlyphBox[]; centerYOffset: number } {
+  const graphemes = splitGraphemes(spec.text);
+  const baseFont = fontString(spec, fontPx);
+  ctx.letterSpacing = "0px";
+  ctx.textBaseline = "alphabetic";
+  ctx.font = baseFont;
+  const rm = ctx.measureText(graphemes.filter((g) => !isEmoji(g)).join("") || "อ");
+  const la = rm.actualBoundingBoxAscent || fontPx * 0.72;
+  const ld = rm.actualBoundingBoxDescent || fontPx * 0.12;
+  const letterH = la + ld;
+  const sp = spec.letterSpacing;
+  const glyphs: GlyphBox[] = [];
+  let x = originX;
+  for (const g of graphemes) {
+    if (isEmoji(g)) {
+      ctx.font = baseFont;
+      const m = ctx.measureText(g);
+      const eh = (m.actualBoundingBoxAscent || fontPx * 0.8) + (m.actualBoundingBoxDescent || 0);
+      const fpx = fontPx * (eh > 0 ? Math.min(1, letterH / eh) : 1);
+      ctx.font = fontString(spec, fpx);
+      const w = ctx.measureText(g).width;
+      glyphs.push({ g, isEmoji: true, x, w, fpx });
+      x += w + sp;
+    } else {
+      ctx.font = baseFont;
+      const w = ctx.measureText(g).width;
+      glyphs.push({ g, isEmoji: false, x, w, fpx: fontPx });
+      x += w + sp;
+    }
+  }
+  return { glyphs, centerYOffset: -(la - ld) / 2 };
+}
+
+// Paint the text, optionally grown outward by `expandPx` (half line width).
 // Defaults to black for tracing; the thumbnail passes real colors.
 function drawTextOn(
   ctx: CanvasRenderingContext2D,
@@ -453,18 +496,39 @@ function drawTextOn(
   expandPx: number,
   color = "#000000"
 ) {
-  ctx.font = fontString(spec, fontPx);
-  ctx.letterSpacing = `${spec.letterSpacing}px`;
-  ctx.textBaseline = "alphabetic";
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
-  if (expandPx > 0) {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = expandPx * 2;
-    ctx.strokeText(spec.text, originX, originY);
+  // fast path: no emoji → draw the whole string in one call
+  if (!splitGraphemes(spec.text).some(isEmoji)) {
+    ctx.font = fontString(spec, fontPx);
+    ctx.letterSpacing = `${spec.letterSpacing}px`;
+    ctx.textBaseline = "alphabetic";
+    if (expandPx > 0) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = expandPx * 2;
+      ctx.strokeText(spec.text, originX, originY);
+    }
+    ctx.fillStyle = color;
+    ctx.fillText(spec.text, originX, originY);
+    return;
   }
-  ctx.fillStyle = color;
-  ctx.fillText(spec.text, originX, originY);
+  // with emoji: draw per-glyph so emoji are scaled to the letter height and
+  // vertically centered on the letters
+  const { glyphs, centerYOffset } = glyphLayout(ctx, spec, fontPx, originX);
+  ctx.letterSpacing = "0px";
+  const centerY = originY + centerYOffset;
+  for (const gl of glyphs) {
+    ctx.font = fontString(spec, gl.fpx);
+    ctx.textBaseline = gl.isEmoji ? "middle" : "alphabetic";
+    const y = gl.isEmoji ? centerY : originY;
+    if (expandPx > 0) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = expandPx * 2;
+      ctx.strokeText(gl.g, gl.x, y);
+    }
+    ctx.fillStyle = color;
+    ctx.fillText(gl.g, gl.x, y);
+  }
 }
 
 // Paint an icon part inside a [boxX,boxY] sizePx square. `growPx` enlarges the
@@ -639,15 +703,10 @@ export async function buildNameplate(
   const graphemes = splitGraphemes(spec.text);
   if (graphemes.some(isEmoji)) {
     const mctx = document.createElement("canvas").getContext("2d")!;
-    mctx.font = fontString(spec, fontPx);
-    mctx.letterSpacing = `${spec.letterSpacing}px`;
-    const ranges: [number, number][] = [];
-    let prevW = 0;
-    for (let i = 0; i < graphemes.length; i++) {
-      const w = mctx.measureText(graphemes.slice(0, i + 1).join("")).width;
-      if (isEmoji(graphemes[i])) ranges.push([originX + prevW, originX + w]);
-      prevW = w;
-    }
+    const { glyphs } = glyphLayout(mctx, spec, fontPx, originX);
+    const ranges: [number, number][] = glyphs
+      .filter((gl) => gl.isEmoji)
+      .map((gl) => [gl.x, gl.x + gl.w]);
     if (ranges.length) {
       const dc = newFrame(W, H);
       drawTextOn(dc, spec, fontPx, originX, originY, 0);
