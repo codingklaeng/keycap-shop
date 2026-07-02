@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { splitGraphemes } from "@/lib/graphemes";
 
 const EMOJI_CATEGORIES: { label: string; emojis: string }[] = [
   { label: "หัวใจ & ดาว", emojis: "❤️🧡💛💚💙💜🖤🤍🤎💕💞💓💗💖💘💝💟✨⭐🌟💫⚡" },
@@ -26,6 +27,15 @@ export function EmojiPicker({
 }) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  // Split each category on grapheme clusters (not code points) — a plain
+  // Array.from()/for-of split breaks multi-codepoint emoji (e.g. a base emoji
+  // + variation selector like "☀️") into two entries, leaving an invisible
+  // "orphan" button for the modifier alone. Reuses the same segmenter the
+  // character-count pricing uses, so it's consistent with what actually prints.
+  const categories = useMemo(
+    () => EMOJI_CATEGORIES.map((cat) => ({ label: cat.label, list: splitGraphemes(cat.emojis) })),
+    []
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -71,11 +81,11 @@ export function EmojiPicker({
           ref={panelRef}
           className="absolute right-0 top-full z-20 mt-2 max-h-72 w-72 max-w-[85vw] overflow-y-auto rounded-xl border border-border bg-card p-3 shadow-lg sm:w-80"
         >
-          {EMOJI_CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <div key={cat.label} className="mb-3 last:mb-0">
               <div className="mb-1.5 text-xs font-medium text-muted">{cat.label}</div>
               <div className="grid grid-cols-7 gap-1 sm:grid-cols-8">
-                {Array.from(cat.emojis).map((em, i) => (
+                {cat.list.map((em, i) => (
                   <button
                     key={`${cat.label}-${i}`}
                     type="button"
