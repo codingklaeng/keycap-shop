@@ -891,6 +891,60 @@ function roundRectPath(
   ctx.closePath();
 }
 
+// Resolve any CSS colour string to r/g/b bytes via the canvas' own
+// normalization (hex → "#rrggbb", named/rgb handled too).
+function resolveRGB(ctx: CanvasRenderingContext2D, color: string) {
+  ctx.save();
+  ctx.fillStyle = "#000000";
+  ctx.fillStyle = color;
+  const s = ctx.fillStyle as string;
+  ctx.restore();
+  if (s[0] === "#") {
+    const n = parseInt(s.slice(1), 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+  const m = s.match(/(\d+)\D+(\d+)\D+(\d+)/);
+  return m ? { r: +m[1], g: +m[2], b: +m[3] } : { r: 0, g: 0, b: 0 };
+}
+
+// Paint the alpha silhouette of `srcCtx` (any drawn features, incl. colour
+// emoji), grown outward by `dilatePx`, as a solid `color` layer onto `dstCtx`.
+// Mirrors the 3D contour base/stroke (bitmap dilation) so the layer hugs text,
+// icons AND colour emoji equally — which strokeText can't outline, which left
+// emoji poking out of the base in the flat thumbnail.
+function paintDilatedSilhouette(
+  dstCtx: CanvasRenderingContext2D,
+  srcCtx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  dilatePx: number,
+  color: string,
+  blurR = 1 // must stay an integer — boxBlur indexes its buffers with it
+) {
+  const src = srcCtx.getImageData(0, 0, W, H).data;
+  const raw = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) raw[i] = src[i * 4 + 3];
+  const grown = boxBlur(dilate(raw, W, H, Math.round(dilatePx)), W, H, blurR);
+  const { r, g, b } = resolveRGB(dstCtx, color);
+  const out = dstCtx.createImageData(W, H);
+  const d = out.data;
+  const lo = 100;
+  const hi = 150; // ramp for a lightly antialiased edge
+  for (let i = 0; i < W * H; i++) {
+    let a = (grown[i] - lo) / (hi - lo);
+    a = a < 0 ? 0 : a > 1 ? 1 : a;
+    d[i * 4] = r;
+    d[i * 4 + 1] = g;
+    d[i * 4 + 2] = b;
+    d[i * 4 + 3] = Math.round(a * 255);
+  }
+  const tmp = document.createElement("canvas");
+  tmp.width = W;
+  tmp.height = H;
+  tmp.getContext("2d")!.putImageData(out, 0, 0);
+  dstCtx.drawImage(tmp, 0, 0);
+}
+
 /** A flat top-view colored thumbnail (PNG data URL) of the nameplate — light
  *  enough to show many at once on the shop board (no WebGL), and it matches how
  *  the printed piece lies flat so staff can grab the right one. */
@@ -990,10 +1044,15 @@ export async function nameplateThumbnail(spec: NameplateSpec): Promise<string> {
     ctx.stroke();
   }
 
-  // base layer
+  // Silhouette of every printed front feature (text + icon + colour emoji),
+  // reused to grow the base/stroke so they hug emoji exactly like the 3D does.
+  const inkCtx = newFrame(W, H);
+  drawTextOn(inkCtx, spec, fontPx, tX, tY, 0, "#000000");
+  if (icon) drawIconOn(inkCtx, icon, "all", iX, iY, iconSize, 0, "#000000");
+
+  // base layer — contour hugs everything via dilation; else a rounded rect
   if (spec.edge === "contour") {
-    drawTextOn(ctx, spec, fontPx, tX, tY, basePad, baseColor);
-    if (icon) drawIconOn(ctx, icon, "all", iX, iY, iconSize, basePad, baseColor);
+    paintDilatedSilhouette(ctx, inkCtx, W, H, basePad, baseColor);
   } else {
     const r = spec.edge === "round" ? Math.min(bx1 - bx0, by1 - by0) * 0.18 : 3;
     ctx.fillStyle = baseColor;
@@ -1001,11 +1060,9 @@ export async function nameplateThumbnail(spec: NameplateSpec): Promise<string> {
     ctx.fill();
   }
 
-  // stroke layer
+  // stroke layer — an outline that hugs text + icon + emoji (dilated silhouette)
   if (hasStroke) {
-    const sc = spec.strokeColor ?? "#111827";
-    drawTextOn(ctx, spec, fontPx, tX, tY, strokeW, sc);
-    if (icon) drawIconOn(ctx, icon, "all", iX, iY, iconSize, strokeW, sc);
+    paintDilatedSilhouette(ctx, inkCtx, W, H, strokeW, spec.strokeColor ?? "#111827");
   }
 
   // icon
