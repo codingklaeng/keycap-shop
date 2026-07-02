@@ -302,7 +302,7 @@ function traceCanvas(
 ): THREE.Shape[] {
   const px = ctx.getImageData(0, 0, W, H).data;
   const raw = new Float32Array(W * H);
-  for (let i = 0; i < W * H; i++) raw[i] = 255 - px[i * 4]; // dark = high
+  for (let i = 0; i < W * H; i++) raw[i] = px[i * 4 + 3]; // opaque (alpha) = inside the shape
   const values = boxBlur(raw, W, H, blurR);
   const result = contours()
     .size([W, H])
@@ -324,16 +324,16 @@ function traceCanvas(
   return shapes;
 }
 
-// A blank white frame that every layer is drawn onto, so traced px coordinates
-// of text + icon line up across layers.
+// A blank TRANSPARENT frame that every layer is drawn onto, so traced px
+// coordinates of text + icon line up across layers. Transparent (not white) so
+// the silhouette can be read from the alpha channel — which works for color
+// emoji too (their glyph coverage is opaque regardless of colour), unlike a
+// darkness test that only catches an emoji's dark-coloured parts.
 function newFrame(W: number, H: number): CanvasRenderingContext2D {
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(8, Math.ceil(W));
   canvas.height = Math.max(8, Math.ceil(H));
-  const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  return ctx;
+  return canvas.getContext("2d")!;
 }
 
 // Paint the text, optionally grown outward by `expandPx` (half line width).
