@@ -3,6 +3,10 @@
 import * as THREE from "three";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
 import { contours } from "d3-contour";
+import { splitGraphemes } from "@/lib/graphemes";
+
+const EMOJI_RE = /\p{Extended_Pictographic}/u;
+const isEmoji = (g: string) => EMOJI_RE.test(g);
 
 export type RingPos = "left" | "top" | "right" | "none";
 export type EdgeStyle = "sharp" | "round" | "contour";
@@ -293,17 +297,8 @@ function boxBlur(src: Float32Array, W: number, H: number, r: number): Float32Arr
   return out;
 }
 
-// contour-trace a B/W canvas into polygons with holes (marching squares)
-function traceCanvas(
-  ctx: CanvasRenderingContext2D,
-  W: number,
-  H: number,
-  blurR: number
-): THREE.Shape[] {
-  const px = ctx.getImageData(0, 0, W, H).data;
-  const raw = new Float32Array(W * H);
-  for (let i = 0; i < W * H; i++) raw[i] = px[i * 4 + 3]; // opaque (alpha) = inside the shape
-  const values = boxBlur(raw, W, H, blurR);
+// marching-squares a scalar field (0..255, threshold 128) into shapes+holes
+function shapesFromValues(values: Float32Array, W: number, H: number): THREE.Shape[] {
   const result = contours()
     .size([W, H])
     .smooth(true)
@@ -322,6 +317,50 @@ function traceCanvas(
     shapes.push(shape);
   }
   return shapes;
+}
+
+// contour-trace a B/W canvas into polygons with holes (marching squares)
+function traceCanvas(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  blurR: number
+): THREE.Shape[] {
+  const px = ctx.getImageData(0, 0, W, H).data;
+  const raw = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) raw[i] = px[i * 4 + 3]; // opaque (alpha) = inside the shape
+  return shapesFromValues(boxBlur(raw, W, H, blurR), W, H);
+}
+
+// Trace the DARK internal features (eyes/mouth/outline) of emoji only — the
+// low-luminance opaque pixels inside the given emoji x-ranges — so faces get
+// raised relief instead of being flat discs.
+function traceEmojiDetail(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  blurR: number,
+  ranges: [number, number][]
+): THREE.Shape[] {
+  const px = ctx.getImageData(0, 0, W, H).data;
+  const raw = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      let inRange = false;
+      for (let r = 0; r < ranges.length; r++) {
+        if (x >= ranges[r][0] && x < ranges[r][1]) {
+          inRange = true;
+          break;
+        }
+      }
+      if (!inRange) continue;
+      const p = (y * W + x) * 4;
+      if (px[p + 3] < 128) continue; // transparent → outside the emoji
+      const lum = 0.299 * px[p] + 0.587 * px[p + 1] + 0.114 * px[p + 2];
+      if (lum < 110) raw[y * W + x] = 255; // dark feature
+    }
+  }
+  return shapesFromValues(boxBlur(raw, W, H, blurR), W, H);
 }
 
 // A blank TRANSPARENT frame that every layer is drawn onto, so traced px
@@ -526,6 +565,33 @@ export async function buildNameplate(
     cy = c.y;
     geo.translate(-cx, -cy, textBackZ);
     group.add(new THREE.Mesh(geo, textMat));
+  }
+
+  // --- emoji detail relief: raise the dark features (eyes/mouth/outline) of any
+  // emoji so faces don't come out as flat discs ---
+  const graphemes = splitGraphemes(spec.text);
+  if (graphemes.some(isEmoji)) {
+    const mctx = document.createElement("canvas").getContext("2d")!;
+    mctx.font = fontString(spec, fontPx);
+    mctx.letterSpacing = `${spec.letterSpacing}px`;
+    const ranges: [number, number][] = [];
+    let prevW = 0;
+    for (let i = 0; i < graphemes.length; i++) {
+      const w = mctx.measureText(graphemes.slice(0, i + 1).join("")).width;
+      if (isEmoji(graphemes[i])) ranges.push([originX + prevW, originX + w]);
+      prevW = w;
+    }
+    if (ranges.length) {
+      const dc = newFrame(W, H);
+      drawTextOn(dc, spec, fontPx, originX, originY, 0);
+      const detailShapes = traceEmojiDetail(dc, dc.canvas.width, dc.canvas.height, blurR, ranges);
+      if (detailShapes.length) {
+        const reliefH = Math.min(0.6, Math.max(0.3, spec.thickness * 0.4));
+        const geo = extrudeLayer(detailShapes, reliefH, k, 0);
+        geo.translate(-cx, -cy, textBackZ + spec.thickness); // sit on top of the emoji face
+        group.add(new THREE.Mesh(geo, textMat));
+      }
+    }
   }
 
   // --- icon layers (front, same level as the text) ---
