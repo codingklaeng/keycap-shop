@@ -199,6 +199,11 @@ export function NameplateControls({
         </Field>
       </div>
 
+      {spec.edge === "contour" && (
+        <Slider label="ความกว้างขอบฐาน" unit="มม." min={0.5} max={8} step={0.5}
+          value={spec.contourWidth ?? 2} onChange={(v) => set("contourWidth", v)} />
+      )}
+
       <Field label="สีฐาน">
         <SwatchPicker colors={colors} value={spec.baseColor} onChange={(h) => set("baseColor", h)} />
       </Field>

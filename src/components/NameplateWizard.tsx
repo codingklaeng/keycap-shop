@@ -29,7 +29,7 @@ const DEFAULT: NameplateSpec = {
   weight: 700,
   style: "normal",
   size: 18,
-  thickness: 4,
+  thickness: 2,
   letterSpacing: 0,
   ring: "left",
   ringDiameter: 12,
@@ -43,14 +43,15 @@ const DEFAULT: NameplateSpec = {
   iconAccentColor: "#fde047",
   iconOffsetX: 0,
   iconOffsetY: 0,
-  baseThickness: 3,
+  baseThickness: 2,
   color: "#6d28d9",
   baseColor: "#e5e7eb",
   edge: "round",
+  contourWidth: 2,
   stroke: false,
   strokeColor: "#111827",
-  strokeWidth: 1.2,
-  strokeHeight: 2,
+  strokeWidth: 1,
+  strokeHeight: 1,
 };
 
 function disposeGroup(g: THREE.Object3D | null) {

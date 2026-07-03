@@ -40,6 +40,7 @@ export type NameplateSpec = {
   color: string; // text color (preview)
   baseColor?: string; // base plate + ring color (preview)
   edge: EdgeStyle; // sharp | round (rectangular base) | contour (hugs the text)
+  contourWidth?: number; // contour base: how far it extends past the text (mm)
   // optional middle stroke layer (outline around the text)
   stroke?: boolean;
   strokeColor?: string;
@@ -626,15 +627,18 @@ export async function buildNameplate(
   const k = spec.size / Math.max(1, textHpx); // mm per px (from metrics)
 
   const bevelMM = spec.edge === "round" ? 0.6 : 0;
-  const padMM = Math.max(3, spec.size * 0.35);
+  const padMM = Math.max(3, spec.size * 0.35); // rectangular/round plate padding (auto)
   const baseT = spec.baseThickness;
   const hasStroke = !!spec.stroke && (spec.strokeWidth ?? 0) > 0;
   const strokeWmm = hasStroke ? (spec.strokeWidth as number) : 0;
   const strokeHmm = hasStroke ? spec.strokeHeight ?? 2 : 0;
 
-  // px expansions for stroke layer + (contour) base outline
+  // px expansions for stroke layer + (contour) base outline. The contour base
+  // width is user-set (mm) — kept at least a hair past the stroke so the stroke
+  // never pokes out from under it.
+  const contourMM = spec.contourWidth ?? 2;
   const strokeExpandPx = hasStroke ? strokeWmm / k : 0;
-  const contourExpandMM = Math.max(padMM, strokeWmm + 1.5);
+  const contourExpandMM = Math.max(contourMM, strokeWmm + 0.6);
   const baseExpandPx = spec.edge === "contour" ? contourExpandMM / k : 0;
   const maxExpandPx = Math.max(strokeExpandPx, baseExpandPx);
 
@@ -1000,7 +1004,12 @@ export async function nameplateThumbnail(spec: NameplateSpec): Promise<string> {
     maxY = Math.max(maxY, iconY + iconSize);
   }
 
-  const basePad = Math.max(textH * 0.34, strokeW + 6, 10);
+  // contour base width is user-set (mm → px), kept past the stroke; rect/round
+  // plate keeps its generous auto padding. Mirrors buildNameplate.
+  const contourMM = spec.contourWidth ?? 2;
+  const contourPadPx = Math.max(contourMM, hasStroke ? (spec.strokeWidth as number) + 0.6 : 0) * pxPerMM;
+  const basePad =
+    spec.edge === "contour" ? contourPadPx : Math.max(textH * 0.34, strokeW + 6, 10);
   const bx0 = minX - basePad;
   const by0 = minY - basePad;
   const bx1 = maxX + basePad;
