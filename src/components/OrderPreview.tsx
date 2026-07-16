@@ -104,6 +104,7 @@ export function OrderPreview({ order }: { order: OrderDetail }) {
       letters={letters}
       baseColor={order.base_color?.swatch ?? null}
       layout={order.layout ?? "horizontal"}
+      shape={order.base_shape ?? "rounded_square"}
       pendantName={order.pendant?.name ?? null}
       pendantImage={null}
     />

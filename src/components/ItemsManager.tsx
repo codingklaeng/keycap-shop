@@ -33,6 +33,7 @@ import type {
   Pendant,
   SocialPlatform,
 } from "@/lib/types";
+import { BASE_SHAPES, BASE_SHAPE_LABEL } from "@/lib/types";
 
 type Tab =
   | "types"
@@ -345,6 +346,7 @@ function TypesTab({ types, onDone }: { types: BaseType[]; onDone: () => void }) 
     await saveBaseType({
       id,
       name: String(fd.get("name")),
+      shape: String(fd.get("shape") || "rounded_square"),
       sort_order: num(fd, "sort_order"),
       active: fd.get("active") === "on",
     });
@@ -354,8 +356,13 @@ function TypesTab({ types, onDone }: { types: BaseType[]; onDone: () => void }) 
     <div className="space-y-3">
       <Card>
         <p className="mb-2 font-semibold">เพิ่มแบบใหม่</p>
-        <form action={(fd) => save(fd)} className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <form action={(fd) => save(fd)} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <input name="name" placeholder="เช่น หัวแมว" required className={inp} />
+          <select name="shape" defaultValue="rounded_square" className={inp}>
+            {BASE_SHAPES.map((s) => (
+              <option key={s} value={s}>{BASE_SHAPE_LABEL[s]}</option>
+            ))}
+          </select>
           <input name="sort_order" type="number" placeholder="ลำดับ" defaultValue={types.length + 1} className={inp} />
           <input type="hidden" name="active" value="on" />
           <button className={btnAdd}>เพิ่ม</button>
@@ -363,8 +370,13 @@ function TypesTab({ types, onDone }: { types: BaseType[]; onDone: () => void }) 
       </Card>
       {types.map((t) => (
         <Card key={t.id}>
-          <form action={(fd) => save(fd, t.id)} className="grid grid-cols-2 items-center gap-2 sm:grid-cols-4">
+          <form action={(fd) => save(fd, t.id)} className="grid grid-cols-2 items-center gap-2 sm:grid-cols-5">
             <input name="name" defaultValue={t.name} className={inp} />
+            <select name="shape" defaultValue={t.shape} className={inp}>
+              {BASE_SHAPES.map((s) => (
+                <option key={s} value={s}>{BASE_SHAPE_LABEL[s]}</option>
+              ))}
+            </select>
             <input name="sort_order" type="number" defaultValue={t.sort_order} className={inp} />
             <label className="flex items-center gap-1 text-sm">
               <input type="checkbox" name="active" defaultChecked={t.active} /> เปิดใช้

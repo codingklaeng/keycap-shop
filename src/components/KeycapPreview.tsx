@@ -1,6 +1,26 @@
 "use client";
 
+import type { CSSProperties } from "react";
+import type { BaseShape } from "@/lib/types";
+
 export type PreviewLetter = { char: string; key: string; text: string };
+
+// Silhouette of the base plate per shape (applied via border-radius / clip-path).
+function shapeStyle(shape: BaseShape): CSSProperties {
+  switch (shape) {
+    case "circle":
+      return { borderRadius: "9999px" };
+    case "hexagon":
+      return { clipPath: "polygon(25% 0%,75% 0%,100% 50%,75% 100%,25% 100%,0% 50%)" };
+    case "octagon":
+      return {
+        clipPath:
+          "polygon(30% 0%,70% 0%,100% 30%,100% 70%,70% 100%,30% 100%,0% 70%,0% 30%)",
+      };
+    default:
+      return { borderRadius: "0.75rem" }; // rounded_square
+  }
+}
 
 function pendantEmoji(name: string | null, image: string | null): string | null {
   if (!name || name.includes("ไม่มี")) return null;
@@ -16,12 +36,14 @@ export function KeycapPreview({
   letters,
   baseColor,
   layout,
+  shape,
   pendantName,
   pendantImage,
 }: {
   letters: PreviewLetter[];
   baseColor: string | null;
   layout: "horizontal" | "vertical";
+  shape: BaseShape;
   pendantName: string | null;
   pendantImage: string | null;
 }) {
@@ -44,10 +66,13 @@ export function KeycapPreview({
 
         {/* base plate holding the keycaps */}
         <div
-          className="flex max-w-[260px] items-center gap-1 overflow-x-auto rounded-xl p-2 shadow-inner"
+          className={`flex max-w-[260px] items-center gap-1 shadow-inner ${
+            shape === "rounded_square" ? "overflow-x-auto" : ""
+          } ${shape === "rounded_square" ? "p-2" : "px-5 py-4"}`}
           style={{
             background: plate,
             boxShadow: "inset 0 1px 2px rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.12)",
+            ...shapeStyle(shape),
           }}
         >
           <div
