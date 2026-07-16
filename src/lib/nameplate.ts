@@ -8,6 +8,17 @@ import { splitGraphemes } from "@/lib/graphemes";
 const EMOJI_RE = /\p{Extended_Pictographic}/u;
 const isEmoji = (g: string) => EMOJI_RE.test(g);
 
+// remove Thai upper/lower combining marks (leave consonants + spacing vowels)
+function stripThaiMarks(s: string): string {
+  let out = "";
+  for (const ch of s) {
+    const cp = ch.codePointAt(0) ?? 0;
+    const isMark = cp === 0x0e31 || (cp >= 0x0e34 && cp <= 0x0e3a) || (cp >= 0x0e47 && cp <= 0x0e4e);
+    if (!isMark) out += ch;
+  }
+  return out;
+}
+
 export type RingPos = "left" | "top" | "right" | "none";
 export type EdgeStyle = "sharp" | "round" | "contour";
 export type FontStyle = "normal" | "italic";
@@ -29,6 +40,7 @@ export type NameplateSpec = {
   color: string; // text color (preview)
   baseColor?: string; // base plate + ring color (preview)
   edge: EdgeStyle; // sharp | round (rectangular base) | contour (hugs the text)
+  contourWidth?: number; // contour base: how far it extends past the text (mm)
   // optional middle stroke layer (outline around the text)
   stroke?: boolean;
   strokeColor?: string;
@@ -458,7 +470,10 @@ function glyphLayout(
   ctx.letterSpacing = "0px";
   ctx.textBaseline = "alphabetic";
   ctx.font = baseFont;
-  const rm = ctx.measureText(graphemes.filter((g) => !isEmoji(g)).join("") || "อ");
+  // measure the consonant-row height only (strip Thai upper/lower marks) so
+  // emoji match the letter body, not the full mark-extended height
+  const refStr = stripThaiMarks(graphemes.filter((g) => !isEmoji(g)).join("")) || "อ";
+  const rm = ctx.measureText(refStr);
   const la = rm.actualBoundingBoxAscent || fontPx * 0.72;
   const ld = rm.actualBoundingBoxDescent || fontPx * 0.12;
   const letterH = la + ld;
@@ -612,15 +627,18 @@ export async function buildNameplate(
   const k = spec.size / Math.max(1, textHpx); // mm per px (from metrics)
 
   const bevelMM = spec.edge === "round" ? 0.6 : 0;
-  const padMM = Math.max(3, spec.size * 0.35);
+  const padMM = Math.max(3, spec.size * 0.35); // rectangular/round plate padding (auto)
   const baseT = spec.baseThickness;
   const hasStroke = !!spec.stroke && (spec.strokeWidth ?? 0) > 0;
   const strokeWmm = hasStroke ? (spec.strokeWidth as number) : 0;
   const strokeHmm = hasStroke ? spec.strokeHeight ?? 2 : 0;
 
-  // px expansions for stroke layer + (contour) base outline
+  // px expansions for stroke layer + (contour) base outline. The contour base
+  // width is user-set (mm) — kept at least a hair past the stroke so the stroke
+  // never pokes out from under it.
+  const contourMM = spec.contourWidth ?? 2;
   const strokeExpandPx = hasStroke ? strokeWmm / k : 0;
-  const contourExpandMM = Math.max(padMM, strokeWmm + 1.5);
+  const contourExpandMM = Math.max(contourMM, strokeWmm + 0.6);
   const baseExpandPx = spec.edge === "contour" ? contourExpandMM / k : 0;
   const maxExpandPx = Math.max(strokeExpandPx, baseExpandPx);
 
@@ -785,28 +803,32 @@ export async function buildNameplate(
     // rectangular/rounded plate sized to enclose everything added so far
     group.updateMatrixWorld(true);
     const cbox = new THREE.Box3().setFromObject(group);
-    const cw = cbox.max.x - cbox.min.x;
-    const ch = cbox.max.y - cbox.min.y;
-    const ccx = (cbox.max.x + cbox.min.x) / 2;
-    const ccy = (cbox.max.y + cbox.min.y) / 2;
-    const plateW = cw + padMM * 2;
-    const plateH = ch + padMM * 2;
-    const r = spec.edge === "round" ? Math.min(plateW, plateH) * 0.18 : 0.4;
-    const baseGeo = new THREE.ExtrudeGeometry(roundedRectShape(plateW, plateH, r), {
-      depth: baseT,
-      bevelEnabled: spec.edge === "round",
-      bevelThickness: 0.5,
-      bevelSize: 0.5,
-      bevelSegments: 2,
-    });
-    baseGeo.translate(ccx, ccy, 0);
-    group.add(new THREE.Mesh(baseGeo, baseMat));
+    // only if there's actual content (empty text → empty group → skip, no NaN)
+    if (isFinite(cbox.min.x)) {
+      const cw = cbox.max.x - cbox.min.x;
+      const ch = cbox.max.y - cbox.min.y;
+      const ccx = (cbox.max.x + cbox.min.x) / 2;
+      const ccy = (cbox.max.y + cbox.min.y) / 2;
+      const plateW = cw + padMM * 2;
+      const plateH = ch + padMM * 2;
+      const r = spec.edge === "round" ? Math.min(plateW, plateH) * 0.18 : 0.4;
+      const baseGeo = new THREE.ExtrudeGeometry(roundedRectShape(plateW, plateH, r), {
+        depth: baseT,
+        bevelEnabled: spec.edge === "round",
+        bevelThickness: 0.5,
+        bevelSize: 0.5,
+        bevelSegments: 2,
+      });
+      baseGeo.translate(ccx, ccy, 0);
+      group.add(new THREE.Mesh(baseGeo, baseMat));
+    }
   }
 
   // keyring placed at the outer edge of the whole plate (in y-up space)
   if (spec.ring !== "none") {
     group.updateMatrixWorld(true);
     const pbox = new THREE.Box3().setFromObject(group);
+    if (isFinite(pbox.min.x)) {
     const pw = pbox.max.x - pbox.min.x;
     const ph = pbox.max.y - pbox.min.y;
     // ring sizing: explicit (mm) from the user, or auto-scaled to the plate
@@ -829,10 +851,11 @@ export async function buildNameplate(
     else ry = pbox.max.y + rOuter * 0.7; // top
     rx += spec.ringOffsetX ?? 0;
     ry += spec.ringOffsetY ?? 0;
-    // the lowest point of the ring sits flush with the base bottom (z = 0) so
-    // it doesn't dip below the plate when the piece is printed lying flat.
-    ringGeo.translate(rx, ry, tube);
-    group.add(new THREE.Mesh(ringGeo, baseMat));
+      // the lowest point of the ring sits flush with the base bottom (z = 0) so
+      // it doesn't dip below the plate when the piece is printed lying flat.
+      ringGeo.translate(rx, ry, tube);
+      group.add(new THREE.Mesh(ringGeo, baseMat));
+    }
   }
 
   // center the whole model (including the ring) at the origin
@@ -842,7 +865,13 @@ export async function buildNameplate(
   const center = new THREE.Vector3();
   box.getSize(size);
   box.getCenter(center);
-  group.position.set(-center.x, -center.y, -center.z);
+  // empty group (e.g. blank text) → keep everything finite so the 3D view
+  // recovers cleanly once text is typed again
+  if (isFinite(center.x)) {
+    group.position.set(-center.x, -center.y, -center.z);
+  } else {
+    size.set(0, 0, 0);
+  }
   group.updateMatrixWorld(true);
 
   return { group, sizeMM: { w: size.x, h: size.y, d: size.z } };
@@ -864,6 +893,80 @@ function roundRectPath(
   ctx.arcTo(x, y + h, x, y, rr);
   ctx.arcTo(x, y, x + w, y, rr);
   ctx.closePath();
+}
+
+// Resolve any CSS colour string to r/g/b bytes via the canvas' own
+// normalization (hex → "#rrggbb", named/rgb handled too).
+function resolveRGB(ctx: CanvasRenderingContext2D, color: string) {
+  ctx.save();
+  ctx.fillStyle = "#000000";
+  ctx.fillStyle = color;
+  const s = ctx.fillStyle as string;
+  ctx.restore();
+  if (s[0] === "#") {
+    const n = parseInt(s.slice(1), 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+  const m = s.match(/(\d+)\D+(\d+)\D+(\d+)/);
+  return m ? { r: +m[1], g: +m[2], b: +m[3] } : { r: 0, g: 0, b: 0 };
+}
+
+// Paint the alpha silhouette of `srcCtx` (any drawn features, incl. colour
+// emoji), grown outward by `dilatePx`, as a solid `color` layer onto `dstCtx`.
+// Mirrors the 3D contour base/stroke (bitmap dilation) so the layer hugs text,
+// icons AND colour emoji equally — which strokeText can't outline, which left
+// emoji poking out of the base in the flat thumbnail.
+function paintDilatedSilhouette(
+  dstCtx: CanvasRenderingContext2D,
+  srcCtx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  dilatePx: number,
+  color: string,
+  blurR = 1 // must stay an integer — boxBlur indexes its buffers with it
+) {
+  const src = srcCtx.getImageData(0, 0, W, H).data;
+  const raw = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) raw[i] = src[i * 4 + 3];
+  const grown = boxBlur(dilate(raw, W, H, Math.round(dilatePx)), W, H, blurR);
+  const { r, g, b } = resolveRGB(dstCtx, color);
+  const out = dstCtx.createImageData(W, H);
+  const d = out.data;
+  const lo = 100;
+  const hi = 150; // ramp for a lightly antialiased edge
+  for (let i = 0; i < W * H; i++) {
+    let a = (grown[i] - lo) / (hi - lo);
+    a = a < 0 ? 0 : a > 1 ? 1 : a;
+    d[i * 4] = r;
+    d[i * 4 + 1] = g;
+    d[i * 4 + 2] = b;
+    d[i * 4 + 3] = Math.round(a * 255);
+  }
+  const tmp = document.createElement("canvas");
+  tmp.width = W;
+  tmp.height = H;
+  tmp.getContext("2d")!.putImageData(out, 0, 0);
+  dstCtx.drawImage(tmp, 0, 0);
+}
+
+// Tight bounding box (canvas px) of the opaque pixels in `ctx`, or null if empty.
+function inkBounds(ctx: CanvasRenderingContext2D, W: number, H: number) {
+  const px = ctx.getImageData(0, 0, W, H).data;
+  let minX = W;
+  let minY = H;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (px[(y * W + x) * 4 + 3] > 40) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  return maxX < 0 ? null : { minX, minY, maxX, maxY };
 }
 
 /** A flat top-view colored thumbnail (PNG data URL) of the nameplate — light
@@ -901,7 +1004,12 @@ export async function nameplateThumbnail(spec: NameplateSpec): Promise<string> {
     maxY = Math.max(maxY, iconY + iconSize);
   }
 
-  const basePad = Math.max(textH * 0.34, strokeW + 6, 10);
+  // contour base width is user-set (mm → px), kept past the stroke; rect/round
+  // plate keeps its generous auto padding. Mirrors buildNameplate.
+  const contourMM = spec.contourWidth ?? 2;
+  const contourPadPx = Math.max(contourMM, hasStroke ? (spec.strokeWidth as number) + 0.6 : 0) * pxPerMM;
+  const basePad =
+    spec.edge === "contour" ? contourPadPx : Math.max(textH * 0.34, strokeW + 6, 10);
   const bx0 = minX - basePad;
   const by0 = minY - basePad;
   const bx1 = maxX + basePad;
@@ -956,19 +1064,56 @@ export async function nameplateThumbnail(spec: NameplateSpec): Promise<string> {
   const iX = iconX + dx;
   const iY = iconY + dy;
 
-  // keyring (under the plate)
+  // Silhouette of every printed front feature (text + icon + colour emoji),
+  // reused both to grow the base/stroke (so they hug emoji like the 3D does)
+  // and to locate the real plate edge the keyring hangs off.
+  const inkCtx = newFrame(W, H);
+  drawTextOn(inkCtx, spec, fontPx, tX, tY, 0, "#000000");
+  if (icon) drawIconOn(inkCtx, icon, "all", iX, iY, iconSize, 0, "#000000");
+
+  // Actual base-plate edges (canvas px). Contour = ink silhouette grown by
+  // basePad; rect/round = the padded text box. The keyring attaches to THESE
+  // real edges (not the raw text box) — scaled-down emoji make the true contour
+  // narrower than the text box, so keying off the box left the ring floating.
+  const ib = inkBounds(inkCtx, W, H);
+  let baseLeft = bx0 + dx;
+  let baseRight = bx1 + dx;
+  let baseTop = by0 + dy;
+  let baseBottom = by1 + dy;
+  if (spec.edge === "contour" && ib) {
+    baseLeft = ib.minX - basePad;
+    baseRight = ib.maxX + basePad;
+    baseTop = ib.minY - basePad;
+    baseBottom = ib.maxY + basePad;
+  }
+
+  // keyring (under the plate), overlapping the real plate edge by 0.3·radius —
+  // the same attachment the 3D torus uses (rx = plate edge − 0.7·outerRadius).
   if (ringOn) {
+    let rx: number;
+    let ry: number;
+    if (spec.ring === "left") {
+      rx = baseLeft - ringR * 0.7;
+      ry = (baseTop + baseBottom) / 2;
+    } else if (spec.ring === "right") {
+      rx = baseRight + ringR * 0.7;
+      ry = (baseTop + baseBottom) / 2;
+    } else {
+      rx = (baseLeft + baseRight) / 2;
+      ry = baseTop - ringR * 0.7;
+    }
+    rx += (spec.ringOffsetX ?? 0) * pxPerMM;
+    ry -= (spec.ringOffsetY ?? 0) * pxPerMM;
     ctx.lineWidth = ringBar * 2;
     ctx.strokeStyle = baseColor;
     ctx.beginPath();
-    ctx.arc(rcx + dx, rcy + dy, Math.max(1, ringR - ringBar), 0, Math.PI * 2);
+    ctx.arc(rx, ry, Math.max(1, ringR - ringBar), 0, Math.PI * 2);
     ctx.stroke();
   }
 
-  // base layer
+  // base layer — contour hugs everything via dilation; else a rounded rect
   if (spec.edge === "contour") {
-    drawTextOn(ctx, spec, fontPx, tX, tY, basePad, baseColor);
-    if (icon) drawIconOn(ctx, icon, "all", iX, iY, iconSize, basePad, baseColor);
+    paintDilatedSilhouette(ctx, inkCtx, W, H, basePad, baseColor);
   } else {
     const r = spec.edge === "round" ? Math.min(bx1 - bx0, by1 - by0) * 0.18 : 3;
     ctx.fillStyle = baseColor;
@@ -976,11 +1121,9 @@ export async function nameplateThumbnail(spec: NameplateSpec): Promise<string> {
     ctx.fill();
   }
 
-  // stroke layer
+  // stroke layer — an outline that hugs text + icon + emoji (dilated silhouette)
   if (hasStroke) {
-    const sc = spec.strokeColor ?? "#111827";
-    drawTextOn(ctx, spec, fontPx, tX, tY, strokeW, sc);
-    if (icon) drawIconOn(ctx, icon, "all", iX, iY, iconSize, strokeW, sc);
+    paintDilatedSilhouette(ctx, inkCtx, W, H, strokeW, spec.strokeColor ?? "#111827");
   }
 
   // icon
