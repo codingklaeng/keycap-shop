@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { markAllDone, markItemDone, saveShopeeMap } from "@/lib/shopee-actions";
+import { forceResync, markAllDone, markItemDone, saveShopeeMap } from "@/lib/shopee-actions";
 import type { ShopeeItemMap, ShopeeSource, ShopeeStockQueue } from "@/lib/types";
 
 export type SyncItem = {
@@ -209,25 +209,52 @@ function MappingTab({
   mapBy: Map<string, ShopeeItemMap>;
   onDone: () => void;
 }) {
-  const bases = items.filter((i) => i.source_table === "base_variants");
-  const nfc = items.filter((i) => i.source_table === "social_platforms");
+  const [query, setQuery] = useState("");
+  const [unmappedOnly, setUnmappedOnly] = useState(false);
+
+  const q = query.trim().toLowerCase();
+  const isUnsynced = (it: SyncItem) => {
+    const m = mapBy.get(keyOf(it.source_table, it.source_id));
+    return !m || !m.active || !m.shopee_label;
+  };
+  const match = (it: SyncItem) =>
+    (!q || it.label.toLowerCase().includes(q)) && (!unmappedOnly || isUnsynced(it));
+
+  const bases = items.filter((i) => i.source_table === "base_variants" && match(i));
+  const nfc = items.filter((i) => i.source_table === "social_platforms" && match(i));
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted">
         ใส่ชื่อ listing + ตัวเลือก (variation) บน Shopee ให้ตรงกับสินค้าแต่ละชิ้น ปิด “ซิงก์”
         ถ้าไม่ต้องการให้ชิ้นนั้นขึ้นงานค้าง
       </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="ค้นหาสินค้า…"
+          className={`${inp} min-w-[180px] flex-1`}
+        />
+        <label className="flex items-center gap-1 text-sm text-muted">
+          <input
+            type="checkbox"
+            checked={unmappedOnly}
+            onChange={(e) => setUnmappedOnly(e.target.checked)}
+          />{" "}
+          เฉพาะที่ยังไม่ผูก
+        </label>
+      </div>
       <Section title="พวงกุญแจคีย์แคป (ฐาน)">
         {bases.map((it) => (
           <MapRow key={keyOf(it.source_table, it.source_id)} item={it} map={mapBy.get(keyOf(it.source_table, it.source_id))} onDone={onDone} />
         ))}
-        {bases.length === 0 && <p className="text-sm text-muted">ยังไม่มีรายการ</p>}
+        {bases.length === 0 && <p className="text-sm text-muted">ไม่พบรายการ</p>}
       </Section>
       <Section title="NFC keychain">
         {nfc.map((it) => (
           <MapRow key={keyOf(it.source_table, it.source_id)} item={it} map={mapBy.get(keyOf(it.source_table, it.source_id))} onDone={onDone} />
         ))}
-        {nfc.length === 0 && <p className="text-sm text-muted">ยังไม่มีรายการ</p>}
+        {nfc.length === 0 && <p className="text-sm text-muted">ไม่พบรายการ</p>}
       </Section>
     </div>
   );
@@ -274,6 +301,21 @@ function MapRow({
             ) : null}
           </p>
           <p className="text-xs text-muted">สต็อกตอนนี้: {item.stock}</p>
+          {map && map.active && map.shopee_label && (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() =>
+                start(async () => {
+                  await forceResync(item.source_table, item.source_id);
+                  onDone();
+                })
+              }
+              className="mt-1 text-xs text-primary underline disabled:opacity-50"
+            >
+              ↻ ตั้ง Shopee ใหม่ให้ตรงตอนนี้
+            </button>
+          )}
         </div>
         <input
           name="shopee_label"

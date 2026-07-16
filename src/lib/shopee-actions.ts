@@ -45,6 +45,23 @@ export async function markAllDone() {
   await pruneOldDone(sb);
 }
 
+// Force a fresh "set Shopee = current stock" task even if the stock hasn't
+// changed — for recovering when the admin suspects Shopee has drifted.
+export async function forceResync(source_table: ShopeeSource, source_id: string) {
+  const sb = await guard();
+  const { data: row } = await sb
+    .from(source_table)
+    .select("stock")
+    .eq("id", source_id)
+    .maybeSingle();
+  const stock = (row as { stock?: number } | null)?.stock;
+  if (typeof stock !== "number") return;
+  const { error } = await sb
+    .from("shopee_stock_queue")
+    .insert({ source_table, source_id, new_stock: stock });
+  if (error) throw new Error(error.message);
+}
+
 // Create/update the Shopee listing mapping for an item. On the active↔inactive
 // transition we keep the queue coherent: turning sync ON enqueues one task to set
 // Shopee to the current stock; turning it OFF clears that item's pending tasks.
