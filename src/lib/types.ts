@@ -77,6 +77,31 @@ export type Pendant = {
   active: boolean;
 };
 
+// Shopee stock sync (manual-first). See docs/SHOPEE_INTEGRATION.md.
+export type ShopeeSource = "base_variants" | "social_platforms";
+
+export type ShopeeItemMap = {
+  id: string;
+  source_table: ShopeeSource;
+  source_id: string;
+  shopee_label: string | null;
+  shopee_item_id: number | null;
+  shopee_model_id: number | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ShopeeStockQueue = {
+  id: string;
+  source_table: ShopeeSource;
+  source_id: string;
+  new_stock: number;
+  status: "pending" | "done";
+  created_at: string;
+  done_at: string | null;
+};
+
 export type OrderStatus =
   | "pending"
   | "in_progress"

@@ -4,7 +4,7 @@ import { logout } from "@/lib/admin-actions";
 export function AdminNav({
   active,
 }: {
-  active: "board" | "items" | "summary" | "letters";
+  active: "board" | "items" | "summary" | "letters" | "shopee";
 }) {
   const link = (active2: string) =>
     `rounded-lg px-3 py-1.5 text-sm font-medium ${
@@ -25,6 +25,9 @@ export function AdminNav({
           </Link>
           <Link href="/admin/letters" className={link("letters")}>
             อันดับตัวอักษร
+          </Link>
+          <Link href="/admin/shopee" className={link("shopee")}>
+            Shopee
           </Link>
         </div>
         <form action={logout}>
