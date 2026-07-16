@@ -56,7 +56,7 @@ export async function getActivePlatforms(): Promise<SocialPlatform[]> {
     .from("social_platforms")
     .select("*")
     .eq("active", true)
-    .gt("stock", 0)
+    .gt("available", 0)
     .order("sort_order");
   return (data ?? []) as SocialPlatform[];
 }
@@ -70,9 +70,9 @@ export async function getActiveCatalog(): Promise<Catalog> {
       sb.from("base_types").select("*").eq("active", true).order("sort_order"),
       sb.from("base_sizes").select("*").eq("active", true).order("sort_order"),
       sb.from("base_colors").select("*").eq("active", true).order("sort_order"),
-      sb.from("base_variants").select("*").eq("active", true).gt("stock", 0).order("sort_order"),
+      sb.from("base_variants").select("*").eq("active", true).gt("available", 0).order("sort_order"),
       sb.from("keycap_colors").select("*").eq("active", true).order("sort_order"),
-      sb.from("keycap_stock").select("*").gt("stock", 0),
+      sb.from("keycap_stock").select("*").gt("available", 0),
       sb.from("pendants").select("*").eq("active", true).order("sort_order"),
       sb.from("keycap_config").select("addon_price").eq("id", 1).maybeSingle(),
     ]);
