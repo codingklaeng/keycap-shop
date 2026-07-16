@@ -154,8 +154,8 @@ function Model({ letters, baseColor, layout, shape, pendantName }: Props) {
 
   const plateDepth = 0.8; // thicker base (was 0.25)
   const keycapDepth = 0.5;
-  // sink the keycaps into the plate so only ~15% of their depth sticks out
-  const keycapZ = plateDepth / 2 + keycapDepth * 0.15 - keycapDepth / 2;
+  // sink the keycaps into the plate so ~30% of their depth sticks out
+  const keycapZ = plateDepth / 2 + keycapDepth * 0.3 - keycapDepth / 2;
   const positions: [number, number, number][] = shown.map((_, i) => {
     const offset = (i - (n - 1) / 2) * gap;
     return horizontal ? [offset, 0, keycapZ] : [0, -offset, keycapZ];
