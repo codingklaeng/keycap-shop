@@ -48,18 +48,22 @@ reserved  = units committed to open orders not yet made
 
 ### Stock effect per order lifecycle step
 
+Decision: **real stock is consumed at `picked_up` ("รับแล้ว")**, so a unit stays *reserved*
+through `pending` → `in_progress` → `ready`. This makes cancellation uniform: any cancel before
+pickup is just a reservation release (nothing was deducted yet).
+
 | Step | Trigger | Effect on each consumed unit |
 |------|---------|------------------------------|
 | **Place order** | `place_*` (creates `pending`) | check `available ≥ qty`, else `*_OUT`; then `reserved += qty` |
-| **→ ready** ("ทำเสร็จ") | status `pending`/`in_progress` → `ready` | `stock -= qty`, `reserved -= qty` (consume) |
-| **→ cancelled** from `pending`/`in_progress` | cancel before it is made | `reserved -= qty` (release; stock untouched) |
-| **→ cancelled** from `ready` | cancel after it is made | `stock += qty` (restock; reserved already 0) |
-| **→ picked_up** from `ready` | handed to customer | no stock change (already consumed at `ready`) |
-| **reopen** `ready` → `in_progress` (rare) | undo a completion | `stock += qty`, `reserved += qty` |
+| **→ picked_up** ("รับแล้ว") | `ready` → `picked_up` | `stock -= qty`, `reserved -= qty` (consume) |
+| **→ cancelled** from `pending` / `in_progress` / `ready` | cancel before pickup | `reserved -= qty` (release; `stock` untouched → the unit becomes available again) |
+| **reopen** `picked_up` → earlier (rare) | undo a pickup | `stock += qty`, `reserved += qty` |
 
-`available` moves by exactly `qty` at *place* and *cancel-before-made*, and is unchanged at
-*ready* — so the customer-facing availability behaves the same as today, but `stock` now reflects
-physical on-hand throughout the open-order window.
+`available` moves by exactly `qty` at *place order* (down) and *cancel* (up), and is unchanged at
+`ready` and `picked_up` (at pickup, `stock` and `reserved` drop together). So customer-facing
+availability behaves the same as today, but `stock` now reflects **physical on-hand** right up to
+pickup. Cancelling a `ready` (already-made) order releases its reservation — availability returns,
+matching today's "คืนของ"; if the physical item was scrapped, the owner adjusts `stock` manually.
 
 **Consumed units of a keycap order:** base_variant ×1, pendant ×0–1, and the `keycap_stock`
 units from `order_letters` (base + upper + lower marks per position, grouped by char+color).
@@ -113,6 +117,9 @@ trigger do the release/restock. (Its current inline restock logic moves into the
   (`keycap_stock.stock > 0`, in-stock variants, `colorsForUnit`). The catalog read must expose
   `available = stock − reserved` and the wizard must use it, so customers can't pick something
   that's fully reserved. (The RPC still enforces it, but the UI should match.)
+- **Show "เหลือ N" to customers** (confirmed): display the remaining `available` next to each
+  choice — base color / size variant, letter color, pendant, NFC platform — so the customer sees
+  scarcity. `0` → the option is disabled/hidden as today.
 - **Catalog loader (`src/lib/catalog.ts`):** select `reserved` alongside `stock` (or compute
   `available` in the query) for base_variants / keycap_stock / social_platforms / pendants.
 
@@ -140,17 +147,18 @@ no oversell; cancelling raises it back.
 
 ## 7. Backfill (one-time, at migration)
 
-Existing **open** orders (`pending`, `in_progress`) already deducted their stock under the old
-model. To move them into the new "reserved" state without changing availability:
+Existing **open** orders (`pending`, `in_progress`, **`ready`**) already deducted their stock
+under the old model. Since the new model keeps them *reserved* until `picked_up`, move them across
+without changing availability:
 
 ```
-for each order in (pending, in_progress):
+for each order in (pending, in_progress, ready):
   for each consumed unit: stock += qty ;  reserved += qty
 ```
 
-`ready` / `picked_up` orders are already consumed under both models (no change); `cancelled`
-already restored (no change). Because line items are normalised, this backfill is exact. Run it in
-the same migration that adds the columns, before the new RPCs go live.
+`picked_up` orders are consumed under both models (no change); `cancelled` already restored (no
+change). Because line items are normalised, this backfill is exact. Run it in the same migration
+that adds the columns, before the new RPCs go live.
 
 ---
 
@@ -161,7 +169,7 @@ normalised, the true value is derivable — a periodic check (or an admin button
 repair:
 
 ```
-expected_reserved(unit) = Σ qty over orders in (pending, in_progress) that consume that unit
+expected_reserved(unit) = Σ qty over orders in (pending, in_progress, ready) that consume that unit
 ```
 
 If `reserved <> expected`, flag/repair. Cheap to run for a small shop.
@@ -185,12 +193,11 @@ touching production. Order flow is customer-facing and must not break.
 
 ---
 
-## 10. Open decisions (confirm before building)
+## 10. Decisions (confirmed)
 
-1. **Consume point.** Recommended: deduct at **`ready`** ("ทำเสร็จ/พร้อมรับ" = physically made).
-   Alternative: at `picked_up`. Pick one — it sets when `stock` actually drops.
-2. **Cancel after `ready`.** The item was already made; restocking `+1` (as today) assumes the
-   base/pendant/tiles go back to inventory. Confirm that's the intended behaviour, or cancellations
-   after `ready` should be disallowed / handled manually.
-3. **`available` display on the storefront.** Show remaining count / "เหลือ N" to customers, or
-   just silently block out-of-stock as today?
+1. **Consume point = `picked_up` ("รับแล้ว").** Stock is deducted only when the customer receives
+   the order. Units stay reserved through `pending`/`in_progress`/`ready`.
+2. **Cancel restores availability (as today).** Since nothing is deducted before pickup, any cancel
+   before `picked_up` just releases the reservation → the unit is available again. (`picked_up`
+   itself cannot be cancelled — unchanged `ALREADY_PICKED_UP` guard.)
+3. **Show "เหลือ N" to customers** on the storefront next to each choice.
