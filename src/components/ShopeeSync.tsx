@@ -121,17 +121,34 @@ function PendingTab({
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate font-medium">{item?.label ?? k}</p>
-                <p className="text-sm text-muted">
-                  ตั้งสต็อกบน Shopee ={" "}
-                  <span className="font-semibold text-foreground">{row.new_stock}</span>
-                  {row.new_stock === 0 && " (สินค้าหมด)"}
+                <p className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-muted">
+                  <span>
+                    ตั้งสต็อกบน Shopee ={" "}
+                    <span className="font-semibold text-foreground">
+                      {row.old_stock != null ? `${row.old_stock} → ${row.new_stock}` : row.new_stock}
+                    </span>
+                    {row.new_stock === 0 && " (สินค้าหมด)"}
+                  </span>
+                  <CopyBtn value={row.new_stock} />
                 </p>
                 {unmapped ? (
                   <p className="mt-1 text-xs text-red-500">
                     ยังไม่ได้ผูก listing — ไปแท็บ “ผูก listing” ก่อน
                   </p>
                 ) : (
-                  <p className="mt-1 truncate text-xs text-muted">listing: {map!.shopee_label}</p>
+                  <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
+                    <span className="truncate">listing: {map!.shopee_label}</span>
+                    {map!.shopee_url && (
+                      <a
+                        href={map!.shopee_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 font-medium text-primary underline"
+                      >
+                        เปิด Shopee ↗
+                      </a>
+                    )}
+                  </p>
                 )}
               </div>
               <button
@@ -206,13 +223,14 @@ function MapRow({
             await saveShopeeMap({
               source_table: item.source_table,
               source_id: item.source_id,
-              shopee_label: (String(fd.get("shopee_label") ?? "").trim() || null),
+              shopee_label: String(fd.get("shopee_label") ?? "").trim() || null,
+              shopee_url: String(fd.get("shopee_url") ?? "").trim() || null,
               active: fd.get("active") === "on",
             });
             onDone();
           })
         }
-        className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_1.4fr_auto_auto]"
+        className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[1.2fr_1.3fr_1.3fr_auto_auto]"
       >
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{item.label}</p>
@@ -221,7 +239,14 @@ function MapRow({
         <input
           name="shopee_label"
           defaultValue={map?.shopee_label ?? ""}
-          placeholder="ชื่อ listing / variation บน Shopee"
+          placeholder="ชื่อ listing / variation"
+          className={inp}
+        />
+        <input
+          name="shopee_url"
+          type="url"
+          defaultValue={map?.shopee_url ?? ""}
+          placeholder="ลิงก์ Shopee (https://…)"
           className={inp}
         />
         <label className="flex items-center gap-1 text-sm">
@@ -264,6 +289,27 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h2 className="text-sm font-semibold text-muted">{title}</h2>
       {children}
     </div>
+  );
+}
+
+function CopyBtn({ value }: { value: number }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(String(value));
+          setDone(true);
+          setTimeout(() => setDone(false), 1200);
+        } catch {
+          // clipboard unavailable (e.g. non-secure context) — ignore
+        }
+      }}
+      className="shrink-0 rounded border border-border px-1.5 py-0.5 text-xs text-muted hover:text-foreground"
+    >
+      {done ? "คัดลอกแล้ว ✓" : "คัดลอกเลข"}
+    </button>
   );
 }
 

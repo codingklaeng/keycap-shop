@@ -52,6 +52,7 @@ export async function saveShopeeMap(input: {
   source_table: ShopeeSource;
   source_id: string;
   shopee_label: string | null;
+  shopee_url: string | null;
   active: boolean;
 }) {
   const sb = await guard();
@@ -69,6 +70,7 @@ export async function saveShopeeMap(input: {
       source_table: input.source_table,
       source_id: input.source_id,
       shopee_label: input.shopee_label,
+      shopee_url: input.shopee_url,
       active: input.active,
       updated_at: new Date().toISOString(),
     },

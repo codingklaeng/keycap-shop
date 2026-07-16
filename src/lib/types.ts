@@ -85,6 +85,7 @@ export type ShopeeItemMap = {
   source_table: ShopeeSource;
   source_id: string;
   shopee_label: string | null;
+  shopee_url: string | null;
   shopee_item_id: number | null;
   shopee_model_id: number | null;
   active: boolean;
@@ -97,6 +98,7 @@ export type ShopeeStockQueue = {
   source_table: ShopeeSource;
   source_id: string;
   new_stock: number;
+  old_stock: number | null;
   status: "pending" | "done";
   created_at: string;
   done_at: string | null;
