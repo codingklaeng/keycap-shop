@@ -66,13 +66,10 @@ export function KeycapPreview({
 
         {/* base plate holding the keycaps */}
         <div
-          className={`flex max-w-[260px] items-center gap-1 shadow-inner ${
-            shape === "rounded_square" ? "overflow-x-auto" : ""
-          } ${shape === "rounded_square" ? "p-2" : "px-5 py-4"}`}
+          className="flex max-w-[260px] items-center gap-1 overflow-x-auto rounded-xl p-2 shadow-inner"
           style={{
             background: plate,
             boxShadow: "inset 0 1px 2px rgba(0,0,0,.18), 0 2px 6px rgba(0,0,0,.12)",
-            ...shapeStyle(shape),
           }}
         >
           <div
@@ -83,7 +80,7 @@ export function KeycapPreview({
             {shown.map((l, i) => (
               <span
                 key={i}
-                className="relative flex items-center justify-center rounded-md font-bold"
+                className="relative flex items-center justify-center font-bold"
                 style={{
                   width: size,
                   height: size,
@@ -92,6 +89,7 @@ export function KeycapPreview({
                   fontSize: size * 0.5,
                   boxShadow:
                     "0 1px 2px rgba(0,0,0,.3), inset 0 -2px 2px rgba(0,0,0,.18)",
+                  ...shapeStyle(shape),
                 }}
               >
                 {/* top gloss */}

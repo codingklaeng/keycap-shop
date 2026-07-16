@@ -75,15 +75,25 @@ function Label({ char, color }: { char: string; color: string }) {
 function Keycap({
   letter,
   position,
+  shape,
 }: {
   letter: PreviewLetter;
   position: [number, number, number];
+  shape: BaseShape;
 }) {
+  const prism = prismFor(shape);
   return (
     <group position={position}>
-      <RoundedBox args={[0.96, 0.96, 0.5]} radius={0.1} smoothness={4}>
-        <meshStandardMaterial color={letter.key} roughness={0.45} metalness={0.08} />
-      </RoundedBox>
+      {prism ? (
+        <mesh rotation={[Math.PI / 2, 0, prism.zRot]}>
+          <cylinderGeometry args={[0.48, 0.48, 0.5, prism.segments]} />
+          <meshStandardMaterial color={letter.key} roughness={0.45} metalness={0.08} />
+        </mesh>
+      ) : (
+        <RoundedBox args={[0.96, 0.96, 0.5]} radius={0.1} smoothness={4}>
+          <meshStandardMaterial color={letter.key} roughness={0.45} metalness={0.08} />
+        </RoundedBox>
+      )}
       <Label char={letter.char} color={letter.text} />
     </group>
   );
@@ -145,24 +155,20 @@ function Model({ letters, baseColor, layout, shape, pendantName }: Props) {
     return horizontal ? [offset, 0, keycapZ] : [0, -offset, keycapZ];
   });
 
-  // base plate sized to fit
+  // base plate sized to fit (always a rounded rectangle — the shape is per keycap)
   const padW = horizontal ? n * gap + 0.5 : 1.5;
   const padH = horizontal ? 1.5 : n * gap + 0.5;
-  const prism = prismFor(shape);
-  // round/polygon plates are a disc big enough to hold the letter span
-  const r = Math.max(padW, padH) / 2;
-  const halfW = prism ? r : padW / 2;
-  const halfH = prism ? r : padH / 2;
+  const plateTop = padH / 2;
 
   const emoji = emojiFor(pendantName);
 
   // keyring: top-center for vertical, left-center for horizontal
   const ringPos: [number, number, number] = horizontal
-    ? [-halfW - 0.35, 0, 0]
-    : [0, halfH + 0.35, 0];
+    ? [-padW / 2 - 0.35, 0, 0]
+    : [0, plateTop + 0.35, 0];
   const connPos: [number, number, number] = horizontal
-    ? [-halfW - 0.08, 0, 0]
-    : [0, halfH + 0.08, 0];
+    ? [-padW / 2 - 0.08, 0, 0]
+    : [0, plateTop + 0.08, 0];
   const connRot: [number, number, number] = horizontal
     ? [0, 0, Math.PI / 2]
     : [0, 0, 0];
@@ -179,25 +185,18 @@ function Model({ letters, baseColor, layout, shape, pendantName }: Props) {
         <meshStandardMaterial color={baseColor ?? "#9ca3af"} metalness={0.45} roughness={0.3} />
       </mesh>
 
-      {/* base plate — rounded rectangle, or a disc/prism for round/hexagon/octagon */}
-      {prism ? (
-        <mesh rotation={[Math.PI / 2, 0, prism.zRot]}>
-          <cylinderGeometry args={[r, r, plateDepth, prism.segments]} />
-          <meshStandardMaterial color={baseColor ?? "#e5e7eb"} roughness={0.6} metalness={0.05} />
-        </mesh>
-      ) : (
-        <RoundedBox args={[padW, padH, plateDepth]} radius={0.14} smoothness={4} position={[0, 0, 0]}>
-          <meshStandardMaterial color={baseColor ?? "#e5e7eb"} roughness={0.6} metalness={0.05} />
-        </RoundedBox>
-      )}
+      {/* base plate */}
+      <RoundedBox args={[padW, padH, plateDepth]} radius={0.14} smoothness={4} position={[0, 0, 0]}>
+        <meshStandardMaterial color={baseColor ?? "#e5e7eb"} roughness={0.6} metalness={0.05} />
+      </RoundedBox>
 
-      {/* keycaps */}
+      {/* keycaps — shaped per base type */}
       {shown.map((l, i) => (
-        <Keycap key={i} letter={l} position={positions[i]} />
+        <Keycap key={i} letter={l} position={positions[i]} shape={shape} />
       ))}
 
       {/* pendant */}
-      {emoji && <EmojiCharm emoji={emoji} y={-halfH - 0.7} />}
+      {emoji && <EmojiCharm emoji={emoji} y={-plateTop - 0.7} />}
     </group>
   );
 }
@@ -208,25 +207,17 @@ const FOV = 32;
 // Bounding metrics of the model so the camera can frame it fully (incl. the
 // keyring and the pendant below), for any layout / text length. The ring sits
 // on top for vertical and on the left for horizontal.
-function metrics(
-  layout: "horizontal" | "vertical",
-  n: number,
-  hasPendant: boolean,
-  shape: BaseShape,
-) {
+function metrics(layout: "horizontal" | "vertical", n: number, hasPendant: boolean) {
   const horizontal = layout === "horizontal";
   const padH = horizontal ? 1.5 : n * GAP + 0.5;
   const padW = horizontal ? n * GAP + 0.5 : 1.5;
-  const prism = prismFor(shape);
-  const r = Math.max(padW, padH) / 2;
-  const halfW = prism ? r : padW / 2;
-  const halfH = prism ? r : padH / 2;
+  const plateTop = padH / 2;
   const ring = 0.63; // ring reach beyond the plate edge
 
-  const maxY = horizontal ? halfH : halfH + ring;
-  const minY = hasPendant ? -halfH - 1.05 : -halfH - 0.05;
-  const minX = horizontal ? -halfW - ring : -halfW;
-  const maxX = halfW;
+  const maxY = horizontal ? plateTop : plateTop + ring;
+  const minY = hasPendant ? -plateTop - 1.05 : -plateTop - 0.05;
+  const minX = horizontal ? -padW / 2 - ring : -padW / 2;
+  const maxX = padW / 2;
 
   return {
     H: maxY - minY,
@@ -241,7 +232,7 @@ export function KeycapScene(props: Props) {
 
   const n = props.letters.length === 0 ? 3 : props.letters.length;
   const hasPendant = emojiFor(props.pendantName) !== null;
-  const { H, W, Xc, Yc } = metrics(props.layout, n, hasPendant, props.shape);
+  const { H, W, Xc, Yc } = metrics(props.layout, n, hasPendant);
 
   // distance that fits both the height and the width (with margin)
   const tanHalf = Math.tan((FOV * Math.PI) / 360);
