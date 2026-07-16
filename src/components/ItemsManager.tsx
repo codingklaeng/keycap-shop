@@ -864,6 +864,7 @@ function KeycapsTab({
     typeFilter.size === 0 ? chars : chars.filter((ch) => typeFilter.has(charCategory(ch)));
   const [newChars, setNewChars] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkQty, setBulkQty] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const allSelected = visibleChars.length > 0 && visibleChars.every((ch) => selected.has(ch));
@@ -892,6 +893,16 @@ function KeycapsTab({
       for (const c of visibleColors) rows.push({ char: ch, color_id: c.id, stock: 0 });
     await bulkSetKeycapStock(rows);
     setSelected(new Set());
+    onDone();
+  }
+  async function setSelectedTo(n: number) {
+    if (selected.size === 0 || !Number.isFinite(n) || n < 0) return;
+    const rows: { char: string; color_id: string; stock: number }[] = [];
+    for (const ch of selected)
+      for (const c of visibleColors) rows.push({ char: ch, color_id: c.id, stock: n });
+    await bulkSetKeycapStock(rows);
+    setSelected(new Set());
+    setBulkQty("");
     onDone();
   }
 
@@ -1220,6 +1231,23 @@ function KeycapsTab({
             >
               ตั้งสต็อก = 0
             </button>
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                min={0}
+                value={bulkQty}
+                onChange={(e) => setBulkQty(e.target.value)}
+                placeholder="จำนวน"
+                className="w-20 rounded-lg border border-border bg-background px-2 py-1.5 text-sm outline-none focus:border-primary"
+              />
+              <button
+                onClick={() => setSelectedTo(parseInt(bulkQty, 10))}
+                disabled={bulkQty === "" || !(parseInt(bulkQty, 10) >= 0)}
+                className="rounded-lg border border-border bg-card px-3 py-1.5 font-medium hover:border-primary disabled:opacity-50"
+              >
+                ตั้งสต็อกเป็น
+              </button>
+            </div>
             <button
               onClick={deleteSelected}
               className="rounded-lg border border-red-300 bg-card px-3 py-1.5 font-medium text-red-600 hover:border-red-500"
