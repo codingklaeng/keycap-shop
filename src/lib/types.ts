@@ -1,8 +1,20 @@
+export type BaseShape = "rounded_square" | "circle" | "hexagon" | "octagon";
+
+export const BASE_SHAPES: BaseShape[] = ["rounded_square", "circle", "hexagon", "octagon"];
+
+export const BASE_SHAPE_LABEL: Record<BaseShape, string> = {
+  rounded_square: "4 เหลี่ยม (ขอบมน)",
+  circle: "วงกลม",
+  hexagon: "หกเหลี่ยม",
+  octagon: "แปดเหลี่ยม",
+};
+
 export type BaseType = {
   id: string;
   name: string;
   sort_order: number;
   active: boolean;
+  shape: BaseShape;
 };
 
 export type BaseSize = {
@@ -164,6 +176,7 @@ export type OrderDetail = {
     url: string;
   } | null;
   nameplate: { text: string; spec: Record<string, unknown> } | null;
+  base_shape: BaseShape | null;
   base_size: { label: string } | null;
   base_color: { name: string; swatch: string | null } | null;
   pendant: { name: string } | null;

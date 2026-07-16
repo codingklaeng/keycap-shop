@@ -283,6 +283,7 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
             letters={previewLetters}
             baseColor={baseColor?.swatch ?? null}
             layout={layout}
+            shape={baseType?.shape ?? "rounded_square"}
             pendantName={pendant?.name ?? null}
             pendantImage={pendant?.image_url ?? null}
           />

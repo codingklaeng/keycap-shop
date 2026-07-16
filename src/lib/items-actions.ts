@@ -12,6 +12,7 @@ async function guard() {
 type BaseTypeInput = {
   id?: string;
   name: string;
+  shape?: string;
   sort_order?: number;
   active?: boolean;
 };

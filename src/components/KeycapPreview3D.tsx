@@ -2,11 +2,13 @@
 
 import { useEffect, useState, type ComponentType } from "react";
 import { KeycapPreview, type PreviewLetter } from "@/components/KeycapPreview";
+import type { BaseShape } from "@/lib/types";
 
 type Props = {
   letters: PreviewLetter[];
   baseColor: string | null;
   layout: "horizontal" | "vertical";
+  shape: BaseShape;
   pendantName: string | null;
   pendantImage: string | null;
 };
@@ -37,6 +39,7 @@ export function KeycapPreview3D(props: Props) {
         letters={props.letters}
         baseColor={props.baseColor}
         layout={props.layout}
+        shape={props.shape}
         pendantName={props.pendantName}
         pendantImage={props.pendantImage}
       />
