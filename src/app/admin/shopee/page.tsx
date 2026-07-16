@@ -11,12 +11,18 @@ export default async function ShopeePage() {
   if (!(await isAdmin())) redirect("/admin/login");
 
   const sb = createAdminClient();
-  const [queue, maps, variants, sizes, colors, types, platforms] = await Promise.all([
+  const [queue, history, maps, variants, sizes, colors, types, platforms] = await Promise.all([
     sb
       .from("shopee_stock_queue")
       .select("*")
       .eq("status", "pending")
       .order("created_at", { ascending: false }),
+    sb
+      .from("shopee_stock_queue")
+      .select("*")
+      .eq("status", "done")
+      .order("done_at", { ascending: false })
+      .limit(50),
     sb.from("shopee_item_map").select("*"),
     sb.from("base_variants").select("id,stock,base_size_id,base_color_id,active").order("sort_order"),
     sb.from("base_sizes").select("id,max_chars,base_type_id"),
@@ -70,6 +76,7 @@ export default async function ShopeePage() {
       <AdminNav active="shopee" />
       <ShopeeSync
         pending={(queue.data ?? []) as ShopeeStockQueue[]}
+        history={(history.data ?? []) as ShopeeStockQueue[]}
         maps={(maps.data ?? []) as ShopeeItemMap[]}
         items={items}
       />
