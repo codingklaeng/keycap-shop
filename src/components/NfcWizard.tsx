@@ -149,6 +149,9 @@ export function NfcWizard({ platforms }: { platforms: SocialPlatform[] }) {
                   <div className="text-sm font-semibold text-primary">
                     {formatBaht(p.price)}
                   </div>
+                  <div className={`text-xs ${p.available <= 3 ? "text-amber-600" : "text-muted"}`}>
+                    เหลือ {p.available}
+                  </div>
                 </button>
               );
             })}

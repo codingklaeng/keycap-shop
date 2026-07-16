@@ -29,6 +29,8 @@ export type BaseVariant = {
   base_color_id: string;
   price: number;
   stock: number;
+  reserved: number;
+  available: number; // generated: stock - reserved
   image_url: string | null;
   sort_order: number;
   active: boolean;
@@ -51,6 +53,8 @@ export type KeycapStock = {
   char: string;
   color_id: string;
   stock: number;
+  reserved: number;
+  available: number; // generated: stock - reserved
 };
 
 export type SocialPlatform = {
@@ -63,6 +67,8 @@ export type SocialPlatform = {
   brand_color: string | null;
   price: number;
   stock: number;
+  reserved: number;
+  available: number; // generated: stock - reserved
   sort_order: number;
   active: boolean;
 };
@@ -73,6 +79,8 @@ export type Pendant = {
   image_url: string | null;
   price: number;
   stock: number;
+  reserved: number;
+  available: number; // generated: stock - reserved
   sort_order: number;
   active: boolean;
 };

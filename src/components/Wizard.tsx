@@ -55,7 +55,7 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
   const availability = useMemo(() => {
     const map = new Map<string, Set<string>>();
     for (const s of catalog.keycapStock) {
-      if (s.stock <= 0) continue;
+      if (s.available <= 0) continue;
       if (!map.has(s.char)) map.set(s.char, new Set());
       map.get(s.char)!.add(s.color_id);
     }
@@ -443,6 +443,9 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
                       <div className="text-sm font-semibold text-primary">
                         {formatBaht(v.price)}
                       </div>
+                      <div className={`text-xs ${v.available <= 3 ? "text-amber-600" : "text-muted"}`}>
+                        เหลือ {v.available}
+                      </div>
                     </button>
                   );
                 })}
@@ -517,12 +520,16 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
             <div className="grid grid-cols-2 gap-3">
               {catalog.pendants.map((p) => {
                 const selected = p.id === pendantId;
+                const out = p.available <= 0;
                 return (
                   <button
                     key={p.id}
-                    onClick={() => setPendantId(p.id)}
+                    onClick={() => !out && setPendantId(p.id)}
+                    disabled={out}
                     className={`rounded-xl border p-3 text-left transition ${
-                      selected
+                      out
+                        ? "cursor-not-allowed border-border bg-card opacity-50"
+                        : selected
                         ? "border-primary bg-primary/5"
                         : "border-border bg-card hover:border-primary"
                     }`}
@@ -540,6 +547,9 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
                     <div className="font-medium">{p.name}</div>
                     <div className="text-xs text-muted">
                       {Number(p.price) > 0 ? `+${formatBaht(p.price)}` : "ฟรี"}
+                    </div>
+                    <div className={`text-xs ${out ? "text-red-500" : p.available <= 3 ? "text-amber-600" : "text-muted"}`}>
+                      {out ? "หมด" : `เหลือ ${p.available}`}
                     </div>
                   </button>
                 );
