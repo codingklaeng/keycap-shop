@@ -16,16 +16,18 @@ type Props = {
   pendantImage: string | null;
 };
 
-// Prism geometry params for non-rounded-square plates: radial segments + an
-// in-plane rotation so a flat edge sits on top.
-function prismFor(shape: BaseShape): { segments: number; zRot: number } | null {
+// Prism geometry params per keycap shape: radial segments + the cylinder
+// thetaStart that orients the polygon flat-top (a flat edge on top & bottom).
+// Orienting via thetaStart (not a mesh z-rotation) keeps the keycap facing the
+// camera — a z-rotation in the Euler would tilt it out of plane.
+function prismFor(shape: BaseShape): { segments: number; thetaStart: number } | null {
   switch (shape) {
     case "circle":
-      return { segments: 48, zRot: 0 };
+      return { segments: 48, thetaStart: 0 };
     case "hexagon":
-      return { segments: 6, zRot: Math.PI / 6 };
+      return { segments: 6, thetaStart: Math.PI / 6 };
     case "octagon":
-      return { segments: 8, zRot: Math.PI / 8 };
+      return { segments: 8, thetaStart: Math.PI / 8 };
     default:
       return null; // rounded_square -> RoundedBox
   }
@@ -85,8 +87,10 @@ function Keycap({
   return (
     <group position={position}>
       {prism ? (
-        <mesh rotation={[Math.PI / 2, 0, prism.zRot]}>
-          <cylinderGeometry args={[0.48, 0.48, 0.5, prism.segments]} />
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry
+            args={[0.48, 0.48, 0.5, prism.segments, 1, false, prism.thetaStart, Math.PI * 2]}
+          />
           <meshStandardMaterial color={letter.key} roughness={0.45} metalness={0.08} />
         </mesh>
       ) : (
