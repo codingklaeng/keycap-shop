@@ -14,6 +14,7 @@ import { formatBaht } from "@/lib/price";
 import {
   ORDER_STATUS_LABEL,
   ORDER_SOURCE_BADGE,
+  shopeeOrderUrl,
   type OrderStatus,
   type OrderSource,
 } from "@/lib/types";
@@ -438,7 +439,22 @@ function OrderCard({
               hour: "2-digit",
               minute: "2-digit",
             })}
-            {order.external_ref && ` · ${order.external_ref}`}
+            {order.external_ref &&
+              (order.source === "shopee" ? (
+                <>
+                  {" · "}
+                  <a
+                    href={shopeeOrderUrl(order.external_ref)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline"
+                  >
+                    {order.external_ref} ↗
+                  </a>
+                </>
+              ) : (
+                ` · ${order.external_ref}`
+              ))}
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
