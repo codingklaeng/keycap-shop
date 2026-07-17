@@ -131,8 +131,10 @@ function EmojiCharm({
   const charmPos: [number, number, number] = down
     ? [ax, ay - CHARM_REACH, 0]
     : [ax + CHARM_REACH, ay, 0];
+  // z stays at 0, the ring's own plane, so the link meets the ring instead of
+  // floating in front of it when the model is turned side-on
   return (
-    <group position={[0, 0, 0.2]}>
+    <>
       <mesh position={linkPos} rotation={linkRot}>
         <cylinderGeometry args={[0.02, 0.02, CHARM_LINK, 8]} />
         <meshStandardMaterial color="#9ca3af" metalness={0.8} roughness={0.3} />
@@ -141,7 +143,7 @@ function EmojiCharm({
         <planeGeometry args={[0.7, 0.7]} />
         <meshBasicMaterial map={tex} transparent />
       </mesh>
-    </group>
+    </>
   );
 }
 
