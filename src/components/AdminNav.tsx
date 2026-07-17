@@ -53,11 +53,19 @@ export async function AdminNav({
             )}
           </Link>
         </div>
-        <form action={logout}>
-          <button className="text-sm text-muted hover:text-foreground">
-            ออกจากระบบ
-          </button>
-        </form>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/orders/new"
+            className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground"
+          >
+            ➕ สร้างออเดอร์
+          </Link>
+          <form action={logout}>
+            <button className="text-sm text-muted hover:text-foreground">
+              ออกจากระบบ
+            </button>
+          </form>
+        </div>
       </div>
     </header>
   );

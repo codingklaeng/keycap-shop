@@ -9,11 +9,24 @@ import { saveLastOrder } from "@/components/TrackOrderButton";
 import { NfcPreview3D } from "@/components/NfcPreview3D";
 import type { SocialPlatform } from "@/lib/types";
 
+// Payload sent to place_nfc_order — shared with the admin create-order flow.
+export type NfcOrderPayload = {
+  p_platform_id: string;
+  p_social_value: string;
+  p_note: string | null;
+  p_customer_name: string | null;
+  p_customer_contact: string | null;
+};
+
 const ERROR_TH: Record<string, string> = {
   EMPTY_VALUE: "กรุณากรอกชื่อช่อง/ลิงก์",
   PLATFORM_INVALID: "แพลตฟอร์มไม่ถูกต้อง",
   PLATFORM_OUT: "แพลตฟอร์มนี้หมดสต็อกแล้ว",
 };
+
+function translateNfcError(msg: string): string {
+  return ERROR_TH[msg] ?? "เกิดข้อผิดพลาด กรุณาลองใหม่";
+}
 
 // Resolve what the customer typed into a final URL + the value to send,
 // with friendly validation. Mirrors the server's generation rules.
@@ -56,7 +69,19 @@ function resolve(
   return { url: withScheme, sendValue: withScheme, error: null };
 }
 
-export function NfcWizard({ platforms }: { platforms: SocialPlatform[] }) {
+export function NfcWizard({
+  platforms,
+  onSubmit,
+  adminMode = false,
+  exitHref = "/",
+  submitLabel = "ยืนยันสั่ง",
+}: {
+  platforms: SocialPlatform[];
+  onSubmit?: (payload: NfcOrderPayload) => Promise<{ order_id: string }>;
+  adminMode?: boolean;
+  exitHref?: string;
+  submitLabel?: string;
+}) {
   const router = useRouter();
   const [platformId, setPlatformId] = useState<string | null>(null);
   const [value, setValue] = useState("");
@@ -75,25 +100,35 @@ export function NfcWizard({ platforms }: { platforms: SocialPlatform[] }) {
     setError(null);
     if (!platform || !resolved || !canSubmit) return;
     setSubmitting(true);
+    const payload: NfcOrderPayload = {
+      p_platform_id: platform.id,
+      p_social_value: resolved.sendValue,
+      p_note: note.trim() || null,
+      p_customer_name: customerName.trim() || null,
+      p_customer_contact: customerContact.trim() || null,
+    };
     try {
-      const sb = createBrowserClient();
-      const { data, error: rpcError } = await sb.rpc("place_nfc_order", {
-        p_platform_id: platform.id,
-        p_social_value: resolved.sendValue,
-        p_note: note.trim() || null,
-        p_customer_name: customerName.trim() || null,
-        p_customer_contact: customerContact.trim() || null,
-      });
-      if (rpcError) {
-        setError(ERROR_TH[rpcError.message] ?? "เกิดข้อผิดพลาด กรุณาลองใหม่");
-        setSubmitting(false);
-        return;
+      let orderId: string;
+      if (onSubmit) {
+        orderId = (await onSubmit(payload)).order_id;
+      } else {
+        const sb = createBrowserClient();
+        const { data, error: rpcError } = await sb.rpc("place_nfc_order", payload);
+        if (rpcError) {
+          setError(translateNfcError(rpcError.message));
+          setSubmitting(false);
+          return;
+        }
+        orderId = (data as { order_id: string }).order_id;
       }
-      const orderId = (data as { order_id: string }).order_id;
-      saveLastOrder(orderId);
+      if (!adminMode) saveLastOrder(orderId);
       router.push(`/order/${orderId}`);
-    } catch {
-      setError("เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่");
+    } catch (e) {
+      setError(
+        onSubmit && e instanceof Error
+          ? translateNfcError(e.message)
+          : "เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่"
+      );
       setSubmitting(false);
     }
   }
@@ -102,7 +137,7 @@ export function NfcWizard({ platforms }: { platforms: SocialPlatform[] }) {
     <div className="flex-1 flex flex-col">
       <header className="sticky top-0 z-10 border-b border-border bg-card/80 backdrop-blur">
         <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
-          <Link href="/" className="text-sm text-muted">
+          <Link href={exitHref} className="text-sm text-muted">
             ← ออก
           </Link>
           <div className="text-sm font-medium">พวงกุญแจ NFC</div>
@@ -243,7 +278,7 @@ export function NfcWizard({ platforms }: { platforms: SocialPlatform[] }) {
             onClick={submit}
             className="rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground disabled:opacity-40"
           >
-            {submitting ? "กำลังส่ง..." : "ยืนยันสั่ง"}
+            {submitting ? "กำลังส่ง..." : submitLabel}
           </button>
         </div>
       </footer>
