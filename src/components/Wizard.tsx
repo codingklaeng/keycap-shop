@@ -11,7 +11,7 @@ import { saveLastOrder } from "@/components/TrackOrderButton";
 import { KeycapPreview3D } from "@/components/KeycapPreview3D";
 import type { Catalog, LetterChoice } from "@/lib/types";
 
-const STEPS = ["ข้อความ + ขนาด", "สีฐาน", "สีตัวอักษร", "ตัวห้อย", "ยืนยัน"];
+const STEPS = ["แบบฐาน + สี", "ข้อความ + สีตัวอักษร", "ตัวห้อย", "ยืนยัน"];
 
 const ERROR_TH: Record<string, string> = {
   EMPTY_TEXT: "กรุณาพิมพ์ข้อความ",
@@ -124,24 +124,30 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
     new Set(units.filter((u) => colorsForUnit(u).length === 0).map((u) => u.char))
   );
 
-  // live preview letters (resolve colors for the mockup at the top)
-  const previewLetters = letters
-    .filter((l) => l.keycap_color_id)
-    .map((l) => {
-      const c = catalog.keycapColors.find((k) => k.id === l.keycap_color_id);
-      return {
-        char: l.char,
-        key: c?.key_color ?? "#9ca3af",
-        text: c?.text_color ?? "#ffffff",
-      };
-    });
+  // live preview letters for the mockup at the top:
+  // - once text is typed, show each letter with its chosen color (grey until picked)
+  // - before that, show as many empty slots as the chosen size, in the base color
+  const previewLetters =
+    graphemes.length > 0
+      ? letters.map((l) => {
+          const c = catalog.keycapColors.find((k) => k.id === l.keycap_color_id);
+          return {
+            char: l.char,
+            key: c?.key_color ?? "#d1d5db",
+            text: c?.text_color ?? "#9ca3af",
+          };
+        })
+      : size
+      ? Array.from({ length: size.max_chars }, () => ({
+          char: "",
+          key: "#d1d5db",
+          text: "#9ca3af",
+        }))
+      : [];
 
-  // sizes for the selected type that fit the text length and have a variant
+  // sizes for the selected type that have an in-stock variant (chosen before text)
   const sizeOptions = catalog.baseSizes.filter(
-    (s) =>
-      s.base_type_id === typeId &&
-      sizesWithVariant.has(s.id) &&
-      (graphemes.length === 0 || graphemes.length <= s.max_chars)
+    (s) => s.base_type_id === typeId && s.active && sizesWithVariant.has(s.id)
   );
 
   // colors available for the chosen size (from in-stock variants)
@@ -156,21 +162,6 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
       .filter((x) => x.color);
   }, [sizeId, catalog.baseVariants, catalog.baseColors]);
 
-  // pick the best size for a given text length within the current type:
-  // exact slot match first, otherwise the smallest size that still fits.
-  function autoSizeId(len: number): string | null {
-    if (len === 0) return null;
-    const cands = catalog.baseSizes.filter(
-      (s) => s.base_type_id === typeId && sizesWithVariant.has(s.id) && s.active
-    );
-    const exact = cands.find((s) => s.max_chars === len);
-    if (exact) return exact.id;
-    const fits = cands
-      .filter((s) => s.max_chars >= len)
-      .sort((a, b) => a.max_chars - b.max_chars);
-    return fits[0]?.id ?? null;
-  }
-
   function handleTextChange(v: string) {
     const upper = v.toUpperCase();
     setText(upper);
@@ -184,19 +175,6 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
       else if (opts.length > 0) next[i] = opts[0].id;
     });
     setLetterColors(next);
-
-    // default-select size = number of letters (realtime as text changes)
-    const auto = autoSizeId(gs.length);
-    setSizeId(auto);
-    if (
-      auto &&
-      colorId &&
-      !catalog.baseVariants.some(
-        (vv) => vv.base_size_id === auto && vv.base_color_id === colorId
-      )
-    ) {
-      setColorId(null);
-    }
   }
 
   function chooseSize(id: string) {
@@ -215,7 +193,6 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
     !!size &&
     graphemes.length <= (size?.max_chars ?? 0) &&
     uniqueUnmakeable.length === 0;
-  const canLeaveBaseColor = !!variant;
   const allLettersColored = letters.every((l) => !!l.keycap_color_id);
 
   async function submit() {
@@ -293,27 +270,6 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
       <main className="mx-auto w-full max-w-lg flex-1 px-4 py-6 pb-28">
         {step === 0 && (
           <section className="space-y-6">
-            <div>
-              <label className="mb-2 block font-semibold">
-                พิมพ์ข้อความที่ต้องการ
-              </label>
-              <input
-                value={text}
-                onChange={(e) => handleTextChange(e.target.value)}
-                placeholder="เช่น ALEX"
-                className="w-full rounded-xl border border-border bg-card px-4 py-3 text-2xl font-bold tracking-widest outline-none focus:border-primary"
-              />
-              <p className="mt-2 text-sm text-muted">
-                จำนวนช่อง (ตัวเต็ม): {units.length}
-                {addonTotal > 0 ? ` · ก้อนเสริม (สระ/วรรณยุกต์): ${addonTotal}` : ""}
-              </p>
-              {uniqueUnmakeable.length > 0 && (
-                <p className="mt-1 text-sm text-red-600">
-                  ตัวที่ทำไม่ได้/หมดสต็อก: {uniqueUnmakeable.join(" ")}
-                </p>
-              )}
-            </div>
-
             {catalog.baseTypes.length > 1 && (
               <div>
                 <label className="mb-2 block font-semibold">เลือกแบบฐาน</label>
@@ -359,12 +315,49 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
                   </button>
                 ))}
               </div>
-              {graphemes.length > 0 && sizeOptions.length === 0 && (
-                <p className="mt-2 text-sm text-red-600">
-                  ไม่มีขนาดที่รองรับข้อความนี้ กรุณาลดจำนวนตัวอักษร
-                </p>
-              )}
             </div>
+
+            {sizeId && (
+              <div>
+                <label className="mb-2 block font-semibold">เลือกสีฐาน</label>
+                {colorOptions.length === 0 ? (
+                  <p className="text-sm text-muted">ยังไม่มีสีสำหรับขนาดนี้</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {colorOptions.map(({ variant: v, color: c }) => {
+                      const selected = c.id === colorId;
+                      const img = v.image_url ?? c.image_url;
+                      return (
+                        <button
+                          key={v.id}
+                          onClick={() => setColorId(c.id)}
+                          className={`rounded-xl border p-3 text-left transition ${
+                            selected
+                              ? "border-primary bg-primary/5"
+                              : "border-border bg-card hover:border-primary"
+                          }`}
+                        >
+                          <div
+                            className="mb-2 h-20 w-full rounded-lg border border-border bg-cover bg-center"
+                            style={{
+                              background: img ? undefined : c.swatch ?? "#ddd",
+                              backgroundImage: img ? `url(${img})` : undefined,
+                            }}
+                          />
+                          <div className="font-medium">{c.name}</div>
+                          <div className="text-sm font-semibold text-primary">
+                            {formatBaht(v.price)}
+                          </div>
+                          <div className={`text-xs ${v.available <= 3 ? "text-amber-600" : "text-muted"}`}>
+                            เหลือ {v.available}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div>
               <label className="mb-2 block font-semibold">
@@ -414,53 +407,40 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
         )}
 
         {step === 1 && (
-          <section>
-            <label className="mb-3 block font-semibold">เลือกสีฐาน</label>
-            {colorOptions.length === 0 ? (
-              <p className="text-sm text-muted">ยังไม่มีสีสำหรับขนาดนี้</p>
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                {colorOptions.map(({ variant: v, color: c }) => {
-                  const selected = c.id === colorId;
-                  const img = v.image_url ?? c.image_url;
-                  return (
-                    <button
-                      key={v.id}
-                      onClick={() => setColorId(c.id)}
-                      className={`rounded-xl border p-3 text-left transition ${
-                        selected
-                          ? "border-primary bg-primary/5"
-                          : "border-border bg-card hover:border-primary"
-                      }`}
-                    >
-                      <div
-                        className="mb-2 h-20 w-full rounded-lg border border-border bg-cover bg-center"
-                        style={{
-                          background: img ? undefined : c.swatch ?? "#ddd",
-                          backgroundImage: img ? `url(${img})` : undefined,
-                        }}
-                      />
-                      <div className="font-medium">{c.name}</div>
-                      <div className="text-sm font-semibold text-primary">
-                        {formatBaht(v.price)}
-                      </div>
-                      <div className={`text-xs ${v.available <= 3 ? "text-amber-600" : "text-muted"}`}>
-                        เหลือ {v.available}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        )}
+          <section className="space-y-6">
+            <div>
+              <label className="mb-2 block font-semibold">
+                พิมพ์ข้อความที่ต้องการ
+              </label>
+              <input
+                value={text}
+                onChange={(e) => handleTextChange(e.target.value)}
+                placeholder="เช่น ALEX"
+                className="w-full rounded-xl border border-border bg-card px-4 py-3 text-2xl font-bold tracking-widest outline-none focus:border-primary"
+              />
+              <p className="mt-2 text-sm text-muted">
+                จำนวนช่อง (ตัวเต็ม): {units.length}
+                {size ? ` / ${size.max_chars}` : ""}
+                {addonTotal > 0 ? ` · ก้อนเสริม (สระ/วรรณยุกต์): ${addonTotal}` : ""}
+              </p>
+              {size && graphemes.length > size.max_chars && (
+                <p className="mt-1 text-sm text-red-600">
+                  ข้อความยาวเกิน {size.max_chars} ช่อง กรุณาลดจำนวนตัวอักษร
+                </p>
+              )}
+              {uniqueUnmakeable.length > 0 && (
+                <p className="mt-1 text-sm text-red-600">
+                  ตัวที่ทำไม่ได้/หมดสต็อก: {uniqueUnmakeable.join(" ")}
+                </p>
+              )}
+            </div>
 
-        {step === 2 && (
-          <section>
-            <label className="mb-3 block font-semibold">
-              เลือกสีของแต่ละตัวอักษร
-            </label>
-            <div className="space-y-3">
+            {graphemes.length > 0 && (
+              <div>
+                <label className="mb-3 block font-semibold">
+                  เลือกสีของแต่ละตัวอักษร
+                </label>
+                <div className="space-y-3">
               {letters.map((l) => {
                 const opts = colorsForUnit(units[l.position]);
                 return (
@@ -511,11 +491,13 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
                   </div>
                 );
               })}
-            </div>
+                </div>
+              </div>
+            )}
           </section>
         )}
 
-        {step === 3 && (
+        {step === 2 && (
           <section>
             <label className="mb-3 block font-semibold">เลือกตัวห้อย</label>
             <div className="grid grid-cols-2 gap-3">
@@ -559,7 +541,7 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
           </section>
         )}
 
-        {step === 4 && (
+        {step === 3 && (
           <section className="space-y-4">
             <div className="rounded-xl border border-border bg-card p-4">
               <div className="mb-3 flex justify-center">
@@ -667,9 +649,8 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
           {step < STEPS.length - 1 ? (
             <button
               disabled={
-                (step === 0 && !canLeaveText) ||
-                (step === 1 && !canLeaveBaseColor) ||
-                (step === 2 && !allLettersColored)
+                (step === 0 && !variant) ||
+                (step === 1 && !(canLeaveText && allLettersColored))
               }
               onClick={() => setStep((s) => s + 1)}
               className="rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground disabled:opacity-40"
