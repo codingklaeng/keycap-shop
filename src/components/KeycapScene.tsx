@@ -103,22 +103,41 @@ function Keycap({
   );
 }
 
-// Charm dangling straight down from the ring centre (anchor = ring position).
-function EmojiCharm({ emoji, anchor }: { emoji: string; anchor: [number, number, number] }) {
+const CHARM_REACH = 0.85; // charm centre distance from the ring centre
+const CHARM_HALF = 0.35; // half the charm plane
+const CHARM_LINK = CHARM_REACH - 0.3; // link stops short of the charm centre
+
+// Charm on a link off the ring (anchor = ring position). It hangs down when the
+// ring is on the left, and points right when the ring is on top — dangling from
+// a top ring would drop the charm over the plate.
+function EmojiCharm({
+  emoji,
+  anchor,
+  direction,
+}: {
+  emoji: string;
+  anchor: [number, number, number];
+  direction: "down" | "right";
+}) {
   const tex = useMemo(() => makeTexture(emoji, "#000", false), [emoji]);
   useEffect(() => () => tex.dispose(), [tex]);
-  const ringY = anchor[1];
-  const emojiY = ringY - 0.85; // charm centre hangs below the ring
-  const linkTop = ringY; // link runs from the ring down to the charm
-  const linkBottom = emojiY + 0.3;
-  const linkLen = Math.max(linkTop - linkBottom, 0.1);
+  const [ax, ay] = anchor;
+  const down = direction === "down";
+  const linkPos: [number, number, number] = down
+    ? [ax, ay - CHARM_LINK / 2, 0]
+    : [ax + CHARM_LINK / 2, ay, 0];
+  // the cylinder runs along its local Y, so lay it flat for the right-pointing link
+  const linkRot: [number, number, number] = down ? [0, 0, 0] : [0, 0, Math.PI / 2];
+  const charmPos: [number, number, number] = down
+    ? [ax, ay - CHARM_REACH, 0]
+    : [ax + CHARM_REACH, ay, 0];
   return (
-    <group position={[anchor[0], 0, 0.2]}>
-      <mesh position={[0, (linkTop + linkBottom) / 2, 0]}>
-        <cylinderGeometry args={[0.02, 0.02, linkLen, 8]} />
+    <group position={[0, 0, 0.2]}>
+      <mesh position={linkPos} rotation={linkRot}>
+        <cylinderGeometry args={[0.02, 0.02, CHARM_LINK, 8]} />
         <meshStandardMaterial color="#9ca3af" metalness={0.8} roughness={0.3} />
       </mesh>
-      <mesh position={[0, emojiY, 0]}>
+      <mesh position={charmPos}>
         <planeGeometry args={[0.7, 0.7]} />
         <meshBasicMaterial map={tex} transparent />
       </mesh>
@@ -207,8 +226,10 @@ function Model({ letters, baseColor, layout, shape, pendantName }: Props) {
         <Keycap key={i} letter={l} position={positions[i]} shape={shape} />
       ))}
 
-      {/* pendant — hangs straight down from the ring centre */}
-      {emoji && <EmojiCharm emoji={emoji} anchor={ringPos} />}
+      {/* pendant — off the ring: down when the ring is on the left, right when on top */}
+      {emoji && (
+        <EmojiCharm emoji={emoji} anchor={ringPos} direction={horizontal ? "down" : "right"} />
+      )}
     </group>
   );
 }
@@ -217,26 +238,26 @@ const GAP = 1.08;
 const FOV = 32;
 
 // Bounding metrics of the model so the camera can frame it fully (incl. the
-// keyring and the pendant below), for any layout / text length. The ring sits
-// on top for vertical and on the left for horizontal.
+// keyring and the pendant), for any layout / text length. The ring sits on top
+// for vertical and on the left for horizontal, and the charm follows it: down
+// from a left ring, right from a top ring.
 function metrics(layout: "horizontal" | "vertical", n: number, hasPendant: boolean) {
   const horizontal = layout === "horizontal";
   const padH = horizontal ? 1.5 : n * GAP + 0.5;
   const padW = horizontal ? n * GAP + 0.5 : 1.5;
   const plateTop = padH / 2;
   const ring = 0.63; // ring reach beyond the plate edge
+  const charm = 0.35 + CHARM_HALF; // ring offset + half the charm plane
 
-  // the pendant hangs straight down from the ring centre
-  const maxY = horizontal ? plateTop : plateTop + ring;
-  // horizontal: ring (and its charm) is on the left, charm drops to ~-1.25
-  // vertical: ring is on top, the charm hangs over the plate (no reach below)
-  const minY = horizontal
-    ? hasPendant
-      ? Math.min(-plateTop - 0.05, -1.25)
-      : -plateTop - 0.05
-    : -plateTop - 0.05;
+  // vertical: the charm sits beside the top ring, reaching a touch above it
+  const maxY = horizontal ? plateTop : plateTop + (hasPendant ? charm : ring);
+  // horizontal: the charm drops below the left ring to ~-1.25
+  const minY =
+    horizontal && hasPendant ? Math.min(-plateTop - 0.05, -1.25) : -plateTop - 0.05;
   const minX = horizontal ? -padW / 2 - (hasPendant ? 0.7 : ring) : -padW / 2;
-  const maxX = padW / 2;
+  // vertical: the charm reaches right of the plate edge
+  const maxX =
+    horizontal || !hasPendant ? padW / 2 : Math.max(padW / 2, CHARM_REACH + CHARM_HALF);
 
   return {
     H: maxY - minY,
