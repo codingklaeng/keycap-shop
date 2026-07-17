@@ -174,6 +174,15 @@ export type AdminOrderResult =
   | { ok: true; order_id: string }
   | { ok: false; code: string };
 
+// Link for a Shopee order's external reference. If the admin pasted a full URL,
+// use it as-is; otherwise treat it as an order number and build the Seller
+// Center order link.
+export function shopeeOrderUrl(ref: string): string {
+  const r = ref.trim();
+  if (/^https?:\/\//i.test(r)) return r;
+  return `https://seller.shopee.co.th/portal/sale/order/${encodeURIComponent(r)}`;
+}
+
 // Badge shown on the board for admin-created orders (customer orders get none).
 export const ORDER_SOURCE_BADGE: Record<
   Exclude<OrderSource, "customer">,

@@ -215,8 +215,12 @@ export function NameplateWizard({
         }
         id = (data as { order_id: string }).order_id;
       }
-      if (!adminMode) saveLastOrder(id);
-      router.push(`/order/${id}`);
+      if (adminMode) {
+        router.push("/admin");
+      } else {
+        saveLastOrder(id);
+        router.push(`/order/${id}`);
+      }
     } catch (e) {
       setError(
         onSubmit && e instanceof Error

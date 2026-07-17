@@ -121,8 +121,12 @@ export function NfcWizard({
         }
         orderId = (data as { order_id: string }).order_id;
       }
-      if (!adminMode) saveLastOrder(orderId);
-      router.push(`/order/${orderId}`);
+      if (adminMode) {
+        router.push("/admin");
+      } else {
+        saveLastOrder(orderId);
+        router.push(`/order/${orderId}`);
+      }
     } catch (e) {
       setError(
         onSubmit && e instanceof Error
