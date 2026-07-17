@@ -11,7 +11,12 @@ import {
   setNameplateActive,
 } from "@/lib/admin-actions";
 import { formatBaht } from "@/lib/price";
-import { ORDER_STATUS_LABEL, type OrderStatus } from "@/lib/types";
+import {
+  ORDER_STATUS_LABEL,
+  ORDER_SOURCE_BADGE,
+  type OrderStatus,
+  type OrderSource,
+} from "@/lib/types";
 import { CopyButton } from "@/components/CopyButton";
 import { announceQueue, primeAudio } from "@/lib/announce";
 import { VoiceSettingsPanel } from "@/components/VoiceSettingsPanel";
@@ -44,6 +49,8 @@ type BoardOrder = {
   created_at: string;
   product_type: "keycap" | "nfc" | "nameplate";
   layout: "horizontal" | "vertical" | null;
+  source: OrderSource;
+  external_ref: string | null;
   customer_name: string | null;
   customer_contact: string | null;
   base_sizes: { max_chars: number; base_types: { name: string } | null } | null;
@@ -78,6 +85,17 @@ function nfcOf(o: BoardOrder): BoardNfc | null {
   return Array.isArray(n) ? (n[0] ?? null) : n;
 }
 
+// Channel badge for admin-created orders; customer (self-service) orders none.
+function SourceBadge({ source }: { source: OrderSource }) {
+  if (source === "customer") return null;
+  const b = ORDER_SOURCE_BADGE[source];
+  return (
+    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+      {b.emoji} {b.label}
+    </span>
+  );
+}
+
 // status -> next action button
 const NEXT_ACTION: Partial<
   Record<OrderStatus, { to: OrderStatus; label: string }>
@@ -98,6 +116,9 @@ export function AdminBoard({ today }: { today: string }) {
   const [depositPct, setDepositPct] = useState(0);
   const [npOpen, setNpOpen] = useState<boolean | null>(null);
   const [editing, setEditing] = useState<BoardOrder | null>(null);
+  const [sourceFilter, setSourceFilter] = useState<"all" | "customer" | "admin">(
+    "all"
+  );
   const announced = useRef<Set<string>>(new Set());
   const seeded = useRef(false);
 
@@ -204,10 +225,17 @@ export function AdminBoard({ today }: { today: string }) {
     return <p className="p-8 text-center text-muted">กำลังโหลด...</p>;
   }
 
-  const active = orders.filter((o) => COLUMN_STATUSES.includes(o.status));
-  const done = orders.filter(
+  const matchesSource = (o: BoardOrder) =>
+    sourceFilter === "all" ||
+    (sourceFilter === "customer"
+      ? o.source === "customer"
+      : o.source !== "customer");
+  const visible = orders.filter(matchesSource);
+  const active = visible.filter((o) => COLUMN_STATUSES.includes(o.status));
+  const done = visible.filter(
     (o) => o.status === "picked_up" || o.status === "cancelled"
   );
+  const adminCount = orders.filter((o) => o.source !== "customer").length;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
@@ -239,6 +267,30 @@ export function AdminBoard({ today }: { today: string }) {
       </div>
 
       {showVoice && <VoiceSettingsPanel onClose={() => setShowVoice(false)} />}
+
+      {adminCount > 0 && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {(
+            [
+              { v: "all", label: "ทั้งหมด" },
+              { v: "customer", label: "ลูกค้าออนไลน์" },
+              { v: "admin", label: `ร้านสร้าง (${adminCount})` },
+            ] as const
+          ).map((f) => (
+            <button
+              key={f.v}
+              onClick={() => setSourceFilter(f.v)}
+              className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
+                sourceFilter === f.v
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-card text-muted"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {npOpen !== null && (
         <div
@@ -377,12 +429,16 @@ function OrderCard({
     >
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-2xl font-extrabold">{order.queue_number}</div>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl font-extrabold">{order.queue_number}</span>
+            <SourceBadge source={order.source} />
+          </div>
           <div className="text-xs text-muted">
             {new Date(order.created_at).toLocaleTimeString("th-TH", {
               hour: "2-digit",
               minute: "2-digit",
             })}
+            {order.external_ref && ` · ${order.external_ref}`}
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">

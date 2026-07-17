@@ -18,6 +18,22 @@ import {
 import { getNameplateColors, type NameplateConfig } from "@/lib/catalog";
 import type { NameplateColor } from "@/lib/types";
 
+// Payload sent to place_nameplate_order — shared with the admin create-order flow.
+export type NameplateOrderPayload = {
+  p_text: string;
+  p_char_count: number;
+  p_spec: NameplateSpec;
+  p_note: string | null;
+  p_customer_name: string;
+  p_customer_contact: string | null;
+};
+
+function translateNameplateError(msg: string): string {
+  if (msg.includes("CUSTOMER_NAME_REQUIRED")) return "กรุณากรอกชื่อผู้รับ";
+  if (msg.includes("NAMEPLATE_CLOSED")) return "ขณะนี้ปิดรับสั่งป้ายชื่อ 3D ชั่วคราว";
+  return "เกิดข้อผิดพลาด กรุณาลองใหม่";
+}
+
 const NameplateCanvas = dynamic(
   () => import("@/components/NameplateCanvas").then((m) => m.NameplateCanvas),
   { ssr: false }
@@ -66,7 +82,19 @@ function disposeGroup(g: THREE.Object3D | null) {
   });
 }
 
-export function NameplateWizard({ config }: { config: NameplateConfig }) {
+export function NameplateWizard({
+  config,
+  onSubmit,
+  adminMode = false,
+  exitHref = "/",
+  submitLabel = "ยืนยันสั่ง",
+}: {
+  config: NameplateConfig;
+  onSubmit?: (payload: NameplateOrderPayload) => Promise<{ order_id: string }>;
+  adminMode?: boolean;
+  exitHref?: string;
+  submitLabel?: string;
+}) {
   const router = useRouter();
   const [spec, setSpec] = useState<NameplateSpec>(DEFAULT);
   const [colors, setColors] = useState<NameplateColor[]>([]);
@@ -165,31 +193,36 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
     setError(null);
     if (!canSubmit) return;
     setSubmitting(true);
+    const payload: NameplateOrderPayload = {
+      p_text: spec.text.trim(),
+      p_char_count: charCount,
+      p_spec: spec,
+      p_note: note.trim() || null,
+      p_customer_name: customerName.trim(),
+      p_customer_contact: customerContact.trim() || null,
+    };
     try {
-      const sb = createBrowserClient();
-      const { data, error: rpcError } = await sb.rpc("place_nameplate_order", {
-        p_text: spec.text.trim(),
-        p_char_count: charCount,
-        p_spec: spec,
-        p_note: note.trim() || null,
-        p_customer_name: customerName.trim(),
-        p_customer_contact: customerContact.trim() || null,
-      });
-      if (rpcError) {
-        const msg = rpcError.message.includes("CUSTOMER_NAME_REQUIRED")
-          ? "กรุณากรอกชื่อผู้รับ"
-          : rpcError.message.includes("NAMEPLATE_CLOSED")
-            ? "ขณะนี้ปิดรับสั่งป้ายชื่อ 3D ชั่วคราว"
-            : "เกิดข้อผิดพลาด กรุณาลองใหม่";
-        setError(msg);
-        setSubmitting(false);
-        return;
+      let id: string;
+      if (onSubmit) {
+        id = (await onSubmit(payload)).order_id;
+      } else {
+        const sb = createBrowserClient();
+        const { data, error: rpcError } = await sb.rpc("place_nameplate_order", payload);
+        if (rpcError) {
+          setError(translateNameplateError(rpcError.message));
+          setSubmitting(false);
+          return;
+        }
+        id = (data as { order_id: string }).order_id;
       }
-      const id = (data as { order_id: string }).order_id;
-      saveLastOrder(id);
+      if (!adminMode) saveLastOrder(id);
       router.push(`/order/${id}`);
-    } catch {
-      setError("เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่");
+    } catch (e) {
+      setError(
+        onSubmit && e instanceof Error
+          ? translateNameplateError(e.message)
+          : "เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่"
+      );
       setSubmitting(false);
     }
   }
@@ -198,7 +231,7 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
     <div className="flex-1 flex flex-col">
       <header className="sticky top-0 z-10 border-b border-border bg-card/90 backdrop-blur">
         <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
-          <Link href="/" className="text-sm text-muted">
+          <Link href={exitHref} className="text-sm text-muted">
             ← ออก
           </Link>
           <div className="text-sm font-medium">ป้ายชื่อ 3D</div>
@@ -263,7 +296,7 @@ export function NameplateWizard({ config }: { config: NameplateConfig }) {
             onClick={submit}
             className="rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground disabled:opacity-40"
           >
-            {submitting ? "กำลังส่ง..." : "ยืนยันสั่ง"}
+            {submitting ? "กำลังส่ง..." : submitLabel}
           </button>
         </div>
       </footer>

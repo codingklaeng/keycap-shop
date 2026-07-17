@@ -11,6 +11,25 @@ import { saveLastOrder } from "@/components/TrackOrderButton";
 import { KeycapPreview3D } from "@/components/KeycapPreview3D";
 import type { Catalog, LetterChoice } from "@/lib/types";
 
+// Payload sent to place_order — shared with the admin create-order flow so it
+// can submit the same shape through a server action instead of the anon RPC.
+export type KeycapOrderPayload = {
+  p_base_variant_id: string;
+  p_pendant_id: string | null;
+  p_layout: "horizontal" | "vertical";
+  p_letters: {
+    position: number;
+    char: string;
+    base: string;
+    upper: string;
+    lower: string;
+    keycap_color_id: string | null;
+  }[];
+  p_note: string | null;
+  p_customer_name: string;
+  p_customer_contact: string | null;
+};
+
 const STEPS = ["แบบฐาน + สี", "ข้อความ + สีตัวอักษร", "ตัวห้อย", "ยืนยัน"];
 
 const ERROR_TH: Record<string, string> = {
@@ -31,7 +50,22 @@ function translateError(msg: string): string {
   return ERROR_TH[msg] ?? "เกิดข้อผิดพลาด กรุณาลองใหม่";
 }
 
-export function Wizard({ catalog }: { catalog: Catalog }) {
+export function Wizard({
+  catalog,
+  onSubmit,
+  adminMode = false,
+  exitHref = "/",
+  submitLabel = "ยืนยันสั่ง",
+}: {
+  catalog: Catalog;
+  // When provided (admin flow), the order is created through this instead of
+  // the customer's anon RPC. Should resolve to the new order id or throw an
+  // Error whose message is a place_order error code (translated for display).
+  onSubmit?: (payload: KeycapOrderPayload) => Promise<{ order_id: string }>;
+  adminMode?: boolean;
+  exitHref?: string;
+  submitLabel?: string;
+}) {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [text, setText] = useState("");
@@ -199,37 +233,47 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
     setError(null);
     if (!variant) return;
     setSubmitting(true);
+    const payload: KeycapOrderPayload = {
+      p_base_variant_id: variant.id,
+      p_pendant_id: pendant?.id ?? null,
+      p_layout: layout,
+      p_letters: letters.map((l) => {
+        const u = units[l.position];
+        return {
+          position: l.position,
+          char: u.char,
+          base: u.base,
+          upper: u.upper,
+          lower: u.lower,
+          keycap_color_id: l.keycap_color_id,
+        };
+      }),
+      p_note: note.trim() || null,
+      p_customer_name: customerName.trim(),
+      p_customer_contact: customerContact.trim() || null,
+    };
     try {
-      const sb = createBrowserClient();
-      const { data, error: rpcError } = await sb.rpc("place_order", {
-        p_base_variant_id: variant.id,
-        p_pendant_id: pendant?.id ?? null,
-        p_layout: layout,
-        p_letters: letters.map((l) => {
-          const u = units[l.position];
-          return {
-            position: l.position,
-            char: u.char,
-            base: u.base,
-            upper: u.upper,
-            lower: u.lower,
-            keycap_color_id: l.keycap_color_id,
-          };
-        }),
-        p_note: note.trim() || null,
-        p_customer_name: customerName.trim(),
-        p_customer_contact: customerContact.trim() || null,
-      });
-      if (rpcError) {
-        setError(translateError(rpcError.message));
-        setSubmitting(false);
-        return;
+      let orderId: string;
+      if (onSubmit) {
+        orderId = (await onSubmit(payload)).order_id;
+      } else {
+        const sb = createBrowserClient();
+        const { data, error: rpcError } = await sb.rpc("place_order", payload);
+        if (rpcError) {
+          setError(translateError(rpcError.message));
+          setSubmitting(false);
+          return;
+        }
+        orderId = (data as { order_id: string }).order_id;
       }
-      const orderId = (data as { order_id: string }).order_id;
-      saveLastOrder(orderId);
+      if (!adminMode) saveLastOrder(orderId);
       router.push(`/order/${orderId}`);
-    } catch {
-      setError("เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่");
+    } catch (e) {
+      setError(
+        onSubmit && e instanceof Error
+          ? translateError(e.message)
+          : "เชื่อมต่อไม่สำเร็จ กรุณาลองใหม่"
+      );
       setSubmitting(false);
     }
   }
@@ -240,7 +284,7 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
     <div className="flex-1 flex flex-col">
       <header className="sticky top-0 z-10 border-b border-border bg-card/80 backdrop-blur">
         <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
-          <Link href="/" className="text-sm text-muted">
+          <Link href={exitHref} className="text-sm text-muted">
             ← ออก
           </Link>
           <div className="text-sm font-medium">
@@ -663,7 +707,7 @@ export function Wizard({ catalog }: { catalog: Catalog }) {
               onClick={submit}
               className="rounded-xl bg-primary px-6 py-3 font-semibold text-primary-foreground disabled:opacity-40"
             >
-              {submitting ? "กำลังส่ง..." : "ยืนยันสั่ง"}
+              {submitting ? "กำลังส่ง..." : submitLabel}
             </button>
           )}
         </div>

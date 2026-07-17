@@ -139,6 +139,53 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   cancelled: "ยกเลิก",
 };
 
+// How an order was created / its sales channel. 'customer' = self-service
+// online; the rest are admin-created (e.g. a Shopee sale re-entered by staff).
+export type OrderSource =
+  | "customer"
+  | "shopee"
+  | "walk_in"
+  | "line"
+  | "facebook"
+  | "other";
+
+// Channels an admin can pick when creating an order (never 'customer').
+export const ADMIN_ORDER_SOURCES: { value: OrderSource; label: string }[] = [
+  { value: "shopee", label: "Shopee" },
+  { value: "walk_in", label: "หน้าร้าน (walk-in)" },
+  { value: "line", label: "LINE" },
+  { value: "facebook", label: "Facebook" },
+  { value: "other", label: "อื่นๆ" },
+];
+
+// Metadata the admin adds on top of a normal order: the sales channel, an
+// optional external reference (e.g. Shopee order number), and whether it's
+// already paid in full (Shopee orders are prepaid).
+export type AdminOrderMeta = {
+  source: OrderSource;
+  external_ref: string | null;
+  markPaid: boolean;
+};
+
+// Result of an admin order-create action. Business failures come back as
+// { ok: false, code } rather than throwing, so the place_* error code survives
+// the server-action boundary and can be translated for display client-side.
+export type AdminOrderResult =
+  | { ok: true; order_id: string }
+  | { ok: false; code: string };
+
+// Badge shown on the board for admin-created orders (customer orders get none).
+export const ORDER_SOURCE_BADGE: Record<
+  Exclude<OrderSource, "customer">,
+  { label: string; emoji: string }
+> = {
+  shopee: { label: "Shopee", emoji: "🛒" },
+  walk_in: { label: "หน้าร้าน", emoji: "🏪" },
+  line: { label: "LINE", emoji: "💬" },
+  facebook: { label: "Facebook", emoji: "📘" },
+  other: { label: "อื่นๆ", emoji: "🏷️" },
+};
+
 export type Order = {
   id: string;
   queue_number: string;
